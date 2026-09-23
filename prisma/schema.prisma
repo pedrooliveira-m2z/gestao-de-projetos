@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  INTERNAL
+  CLIENT
+}
+
+enum TriggerType {
+  BRIEFING
+  KICKOFF
+  CONDICOES_INICIO
+  MARCO_CICLO
+  MANUAL
+  CLICKUP_ONLY
+}
+
+enum DayType {
+  UTEIS
+  CORRIDOS
+}
+
+enum DeliverableKind {
+  BAR
+  MILESTONE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(INTERNAL)
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  logoUrl   String?
+  createdAt DateTime  @default(now())
+  projects  Project[]
+  users     User[]
+}
+
+model Project {
+  id                 String    @id @default(cuid())
+  clientId           String
+  client             Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name               String
+  slug               String    @unique
+  briefingDate       DateTime
+  cutoffDate         DateTime?
+  clickupWorkspaceId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  fronts             Front[]
+  snapshots          ReportSnapshot[]
+}
+
+model Front {
+  id           String       @id @default(cuid())
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name         String
+  vendorName   String
+  colorHex     String       @default("#2563eb")
+  order        Int          @default(0)
+  deliverables Deliverable[]
+}
+
+model Deliverable {
+  id                String          @id @default(cuid())
+  frontId           String
+  front             Front           @relation(fields: [frontId], references: [id], onDelete: Cascade)
+  name              String
+  ruleLabel         String?
+  kind              DeliverableKind @default(BAR)
+  triggerType       TriggerType     @default(MANUAL)
+  triggerDate       DateTime?
+  slaDays           Int?
+  slaDayType        DayType         @default(UTEIS)
+  isEstimated       Boolean         @default(false)
+  startDateOverride DateTime?
+  endDateOverride   DateTime?
+  clickupTaskId     String?
+  manualStatusLabel String?
+  hasApprovalWindow Boolean         @default(false)
+  approvalDays      Int             @default(5)
+  order             Int             @default(0)
+  colorHexOverride  String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model ReportSnapshot {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cutoffDate  DateTime
+  generatedAt DateTime @default(now())
+  data        Json
+}
+
+model ClickupTaskCache {
+  taskId       String   @id
+  name         String
+  status       String
+  dueDate      DateTime?
+  url          String
+  lastSyncedAt DateTime @default(now())
+}

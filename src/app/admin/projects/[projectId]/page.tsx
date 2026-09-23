@@ -1,0 +1,236 @@
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { TopNav } from "@/components/TopNav";
+import { formatFullDate } from "@/lib/format";
+import {
+  addDeliverableAction,
+  addFrontAction,
+  deleteDeliverableAction,
+  deleteFrontAction,
+  updateCutoffAction,
+} from "../../actions";
+
+export default async function AdminProjectPage({
+  params,
+}: {
+  params: Promise<{ projectId: string }>;
+}) {
+  const session = await auth();
+  if (session?.user?.role === "CLIENT") redirect("/dashboard");
+
+  const { projectId } = await params;
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      client: true,
+      fronts: { orderBy: { order: "asc" }, include: { deliverables: { orderBy: { order: "asc" } } } },
+    },
+  });
+  if (!project) notFound();
+
+  const updateCutoff = updateCutoffAction.bind(null, project.id);
+  const addFront = addFrontAction.bind(null, project.id);
+
+  return (
+    <div className="min-h-screen">
+      <TopNav />
+      <main className="mx-auto max-w-4xl px-6 py-10">
+        <p className="text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+          {project.client.name}
+        </p>
+        <h1 className="text-2xl font-bold text-neutral-900">{project.name}</h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          Briefing em {formatFullDate(project.briefingDate)}
+        </p>
+
+        <form action={updateCutoff} className="mt-4 flex items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-neutral-600">Data de corte (hoje)</label>
+            <input
+              type="date"
+              name="cutoffDate"
+              defaultValue={(project.cutoffDate ?? new Date()).toISOString().slice(0, 10)}
+              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-semibold hover:border-neutral-500"
+          >
+            Atualizar corte
+          </button>
+        </form>
+
+        <section className="mt-8 space-y-6">
+          {project.fronts.map((front) => {
+            const addDeliverable = addDeliverableAction.bind(null, project.id, front.id);
+            const deleteFront = deleteFrontAction.bind(null, project.id, front.id);
+            return (
+              <div key={front.id} className="rounded-lg border border-neutral-200 bg-white">
+                <div
+                  className="flex items-center justify-between px-4 py-2 text-sm font-bold text-white"
+                  style={{ backgroundColor: front.colorHex }}
+                >
+                  <span>
+                    {front.vendorName} — {front.name}
+                  </span>
+                  <form action={deleteFront}>
+                    <button type="submit" className="text-xs font-semibold text-white/80 hover:text-white">
+                      Remover frente
+                    </button>
+                  </form>
+                </div>
+
+                <div className="divide-y divide-neutral-100">
+                  {front.deliverables.map((d) => {
+                    const deleteDeliverable = deleteDeliverableAction.bind(null, project.id, d.id);
+                    return (
+                      <div key={d.id} className="flex items-center justify-between px-4 py-2 text-sm">
+                        <div>
+                          <p className="font-medium text-neutral-800">{d.name}</p>
+                          <p className="text-xs text-neutral-500">
+                            {d.ruleLabel ?? d.triggerType} · {d.kind}
+                          </p>
+                        </div>
+                        <form action={deleteDeliverable}>
+                          <button type="submit" className="text-xs text-red-600 hover:underline">
+                            remover
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <form
+                  action={addDeliverable}
+                  className="grid gap-2 border-t border-neutral-200 p-4 sm:grid-cols-3"
+                >
+                  <input
+                    name="name"
+                    placeholder="Nome da entrega"
+                    required
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    name="ruleLabel"
+                    placeholder="Regra de prazo (texto exibido)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <select name="kind" className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs">
+                    <option value="BAR">Barra (período)</option>
+                    <option value="MILESTONE">Marco (diamante)</option>
+                  </select>
+                  <select
+                    name="triggerType"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  >
+                    <option value="BRIEFING">Gatilho: briefing do projeto</option>
+                    <option value="KICKOFF">Gatilho: kickoff (data manual)</option>
+                    <option value="CONDICOES_INICIO">Gatilho: condições de início (data manual)</option>
+                    <option value="MARCO_CICLO">Gatilho: marco de ciclo (data manual)</option>
+                    <option value="MANUAL">Gatilho: datas manuais (sem cálculo de SLA)</option>
+                    <option value="CLICKUP_ONLY">Gatilho: só ClickUp (sem cálculo de SLA)</option>
+                  </select>
+                  <input
+                    type="date"
+                    name="triggerDate"
+                    title="Data do gatilho (kickoff/condições/marco/manual)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    type="number"
+                    name="slaDays"
+                    placeholder="Nº de dias do SLA"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <select
+                    name="slaDayType"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  >
+                    <option value="UTEIS">Dias úteis</option>
+                    <option value="CORRIDOS">Dias corridos</option>
+                  </select>
+                  <input
+                    type="date"
+                    name="startDateOverride"
+                    title="Início manual da barra no Gantt (opcional)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    type="date"
+                    name="endDateOverride"
+                    title="Fim manual / data-limite fixa (opcional)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    name="clickupTaskId"
+                    placeholder="ID da tarefa no ClickUp (opcional)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    name="manualStatusLabel"
+                    placeholder="Situação manual (se sem ClickUp)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                    <input type="checkbox" name="isEstimated" /> data estimada (*)
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                    <input type="checkbox" name="hasApprovalWindow" /> tem janela de aprovação
+                  </label>
+                  <input
+                    type="number"
+                    name="approvalDays"
+                    placeholder="Dias de aprovação (padrão 5)"
+                    className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"
+                  >
+                    Adicionar entrega
+                  </button>
+                </form>
+              </div>
+            );
+          })}
+        </section>
+
+        <section className="mt-8">
+          <h2 className="text-sm font-bold text-neutral-700 uppercase">Nova frente</h2>
+          <form
+            action={addFront}
+            className="mt-3 grid gap-2 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-4"
+          >
+            <input
+              name="name"
+              placeholder="Nome (ex: Web)"
+              required
+              className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            />
+            <input
+              name="vendorName"
+              placeholder="Responsável (ex: M2Z Creative Tech)"
+              required
+              className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            />
+            <input
+              type="color"
+              name="colorHex"
+              defaultValue="#2563eb"
+              className="h-9 w-full rounded-md border border-neutral-300"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-[#0b0e14] px-3 py-1.5 text-sm font-semibold text-white hover:bg-black"
+            >
+              Adicionar frente
+            </button>
+          </form>
+        </section>
+      </main>
+    </div>
+  );
+}
