@@ -98,7 +98,7 @@ export function GanttChart({
                         className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rotate-45"
                         style={{
                           left: `${pct(d.ganttEnd, rangeStart, rangeEnd)}%`,
-                          backgroundColor: front.colorHex,
+                          backgroundColor: d.colorHex,
                         }}
                         title={formatShortDate(d.ganttEnd)}
                       />
@@ -114,7 +114,7 @@ export function GanttChart({
                                 0.6,
                                 pct(d.ganttEnd, rangeStart, rangeEnd) - pct(d.ganttStart, rangeStart, rangeEnd)
                               )}%`,
-                              backgroundColor: front.colorHex,
+                              backgroundColor: d.colorHex,
                             }}
                             title={`${formatShortDate(d.ganttStart)} - ${formatShortDate(d.ganttEnd)}`}
                           />

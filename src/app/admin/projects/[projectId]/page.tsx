@@ -15,6 +15,7 @@ import {
   deleteDeliverableAction,
   deleteFrontAction,
   updateCutoffAction,
+  updateDeliverableColorAction,
 } from "../../actions";
 
 export default async function AdminProjectPage({
@@ -103,19 +104,54 @@ export default async function AdminProjectPage({
                 <div className="divide-y divide-neutral-100">
                   {front.deliverables.map((d) => {
                     const deleteDeliverable = deleteDeliverableAction.bind(null, project.id, d.id);
+                    const updateColor = updateDeliverableColorAction.bind(null, project.id, d.id);
                     return (
                       <div key={d.id} className="flex items-center justify-between px-4 py-2 text-sm">
                         <div>
-                          <p className="font-medium text-neutral-800">{d.name}</p>
+                          <p className="flex items-center gap-1.5 font-medium text-neutral-800">
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: d.colorHexOverride ?? front.colorHex }}
+                            />
+                            {d.name}
+                          </p>
                           <p className="text-xs text-neutral-500">
                             {d.ruleLabel ?? d.triggerType} · {d.kind}
                           </p>
                         </div>
-                        <form action={deleteDeliverable}>
-                          <button type="submit" className="text-xs text-red-600 hover:underline">
-                            remover
-                          </button>
-                        </form>
+                        <div className="flex items-center gap-3">
+                          <form action={updateColor} className="flex items-center gap-1">
+                            <input
+                              type="color"
+                              name="colorHexOverride"
+                              defaultValue={d.colorHexOverride ?? front.colorHex}
+                              title="Cor desta entrega"
+                              className="h-6 w-7 cursor-pointer rounded border border-neutral-300"
+                            />
+                            <button
+                              type="submit"
+                              className="text-[11px] text-neutral-500 hover:text-neutral-800"
+                            >
+                              salvar cor
+                            </button>
+                          </form>
+                          {d.colorHexOverride && (
+                            <form action={updateColor}>
+                              <input type="hidden" name="colorHexOverride" value="" />
+                              <button
+                                type="submit"
+                                className="text-[11px] text-neutral-400 underline hover:text-neutral-700"
+                              >
+                                usar cor da frente
+                              </button>
+                            </form>
+                          )}
+                          <form action={deleteDeliverable}>
+                            <button type="submit" className="text-xs text-red-600 hover:underline">
+                              remover
+                            </button>
+                          </form>
+                        </div>
                       </div>
                     );
                   })}
@@ -262,6 +298,16 @@ export default async function AdminProjectPage({
                     placeholder="Dias de aprovação (padrão 5)"
                     className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
                   />
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                    <input type="checkbox" name="hasColorOverride" /> cor própria
+                    <input
+                      type="color"
+                      name="colorHexOverride"
+                      defaultValue={front.colorHex}
+                      title="Só aplica se 'cor própria' estiver marcado; senão usa a cor da frente"
+                      className="h-7 w-9 cursor-pointer rounded border border-neutral-300"
+                    />
+                  </label>
                   <button
                     type="submit"
                     className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"

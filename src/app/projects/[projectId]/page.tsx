@@ -148,7 +148,7 @@ export default async function ProjectExecutivePage({
                       <td className="px-4 py-2.5">
                         <span
                           className="mr-2 inline-block h-2 w-2 rounded-full align-middle"
-                          style={{ backgroundColor: front.colorHex }}
+                          style={{ backgroundColor: d.colorHex }}
                         />
                         {front.name} — {d.name}
                       </td>

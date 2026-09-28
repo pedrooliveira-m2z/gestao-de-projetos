@@ -195,7 +195,7 @@ function ExecutiveSummaryPage({ view }: { view: ProjectView }) {
             front.deliverables.map((d) => (
               <View key={d.id} style={styles.tRow}>
                 <View style={[{ width: colWidths.frente, flexDirection: "row", alignItems: "center", padding: 6 }]}>
-                  <View style={[styles.dot, { backgroundColor: front.colorHex }]} />
+                  <View style={[styles.dot, { backgroundColor: d.colorHex }]} />
                   <Text style={{ fontSize: 7.5, color: "#374151" }}>
                     {front.name} — {d.name}
                   </Text>
@@ -316,14 +316,13 @@ function GanttPage({ view }: { view: ProjectView }) {
               );
             }
             const d = row.deliverable;
-            const front = row.front;
             const barY = y + rowHeight / 2 - 3.5;
             return (
               <React.Fragment key={i}>
                 {d.kind === "MILESTONE" && d.ganttEnd ? (
                   <Polygon
                     points={`${labelWidth + x(d.ganttEnd)},${y + 2} ${labelWidth + x(d.ganttEnd) + 5},${y + rowHeight / 2} ${labelWidth + x(d.ganttEnd)},${y + rowHeight - 2} ${labelWidth + x(d.ganttEnd) - 5},${y + rowHeight / 2}`}
-                    fill={front.colorHex}
+                    fill={d.colorHex}
                   />
                 ) : (
                   d.ganttStart &&
@@ -335,7 +334,7 @@ function GanttPage({ view }: { view: ProjectView }) {
                         width={Math.max(2, x(d.ganttEnd) - x(d.ganttStart))}
                         height={7}
                         rx={1.5}
-                        fill={front.colorHex}
+                        fill={d.colorHex}
                       />
                       {d.hasApprovalWindow && d.approvalWindowStart && (
                         <Rect

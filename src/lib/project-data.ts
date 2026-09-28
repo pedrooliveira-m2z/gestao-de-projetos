@@ -11,6 +11,8 @@ export interface DeliverableView {
   name: string;
   ruleLabel: string | null;
   kind: "BAR" | "MILESTONE";
+  colorHex: string;
+  colorHexOverride: string | null;
   status: DeliverableStatus;
   statusLabel: string;
   situacaoClickup: string | null;
@@ -93,6 +95,8 @@ export async function loadProjectView(projectId: string): Promise<ProjectView | 
         name: d.name,
         ruleLabel: d.ruleLabel,
         kind: d.kind,
+        colorHex: d.colorHexOverride ?? front.colorHex,
+        colorHexOverride: d.colorHexOverride,
         status: timeline.status,
         statusLabel: timeline.statusLabel,
         situacaoClickup: clickupSnapshot?.status ?? d.manualStatusLabel ?? null,

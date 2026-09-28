@@ -127,6 +127,10 @@ export async function addDeliverableAction(projectId: string, frontId: string, f
       manualStatusLabel: String(formData.get("manualStatusLabel") ?? "") || null,
       hasApprovalWindow: formData.get("hasApprovalWindow") === "on",
       approvalDays: parseOptionalInt(formData.get("approvalDays")) ?? 5,
+      colorHexOverride:
+        formData.get("hasColorOverride") === "on"
+          ? String(formData.get("colorHexOverride") ?? "") || null
+          : null,
       order: count,
     },
   });
@@ -139,6 +143,23 @@ export async function addDeliverableAction(projectId: string, frontId: string, f
 export async function deleteDeliverableAction(projectId: string, deliverableId: string) {
   await assertInternal();
   await prisma.deliverable.delete({ where: { id: deliverableId } });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
+export async function updateDeliverableColorAction(
+  projectId: string,
+  deliverableId: string,
+  formData: FormData
+) {
+  await assertInternal();
+  const colorHexOverride = String(formData.get("colorHexOverride") ?? "").trim();
+  await prisma.deliverable.update({
+    where: { id: deliverableId },
+    // Empty string means "clear the override and fall back to the front's color".
+    data: { colorHexOverride: colorHexOverride || null },
+  });
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/gantt`);
