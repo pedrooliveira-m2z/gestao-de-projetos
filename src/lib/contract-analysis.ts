@@ -1,9 +1,30 @@
 // Extracts text from an uploaded contract (PDF/DOCX) and asks an LLM (via Vercel AI Gateway) to
 // suggest delivery-deadline rules for a Front, in the same shape the admin would type manually.
+//
+// pdf-parse and mammoth are loaded lazily (dynamic import) instead of at module top level: this
+// file is reachable from the admin project page's import graph even on a plain GET, and pdf-parse
+// pulls in pdfjs-dist, whose Node "legacy" build throws `ReferenceError: DOMMatrix is not defined`
+// as soon as it's evaluated in a serverless runtime without the optional @napi-rs/canvas package —
+// crashing the whole page just by being imported. Loading it only inside extractContractText keeps
+// that blast radius to the upload action itself, and the polyfill below keeps that action working.
 
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 import type { DayType, TriggerType } from "@prisma/client";
+
+function polyfillPdfjsCanvasGlobals() {
+  // pdfjs-dist's Node fallback checks these globals and silently limits itself to text-only
+  // extraction when they're missing an actual canvas backend — but only if they exist at all.
+  // We never call any rendering API (getScreenshot/getImage), so empty stubs are enough.
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (typeof g.DOMMatrix === "undefined") {
+    g.DOMMatrix = class DOMMatrix {};
+  }
+  if (typeof g.ImageData === "undefined") {
+    g.ImageData = class ImageData {};
+  }
+  if (typeof g.Path2D === "undefined") {
+    g.Path2D = class Path2D {};
+  }
+}
 
 export interface ContractSuggestion {
   name: string;
@@ -26,6 +47,8 @@ export async function extractContractText(
 ): Promise<string> {
   const lower = fileName.toLowerCase();
   if (mimeType.includes("pdf") || lower.endsWith(".pdf")) {
+    polyfillPdfjsCanvasGlobals();
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     try {
       const result = await parser.getText();
@@ -39,6 +62,7 @@ export async function extractContractText(
     mimeType.includes("officedocument") ||
     lower.endsWith(".docx")
   ) {
+    const mammoth = (await import("mammoth")).default;
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   }
