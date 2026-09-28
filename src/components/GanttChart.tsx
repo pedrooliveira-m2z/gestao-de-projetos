@@ -19,6 +19,21 @@ function weeklyTicks(start: Date, end: Date): Date[] {
   return ticks;
 }
 
+function enumerateDays(start: Date, end: Date): Date[] {
+  const days: Date[] = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    days.push(new Date(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+/** Left offset, as a CSS calc(), for a date inside the timeline area (right of the label column). */
+function timelineLeft(pctValue: number): string {
+  return `calc(${LABEL_COL_WIDTH}px + (100% - ${LABEL_COL_WIDTH}px) * ${pctValue / 100})`;
+}
+
 export function GanttChart({
   fronts,
   cutoffDate,
@@ -42,6 +57,7 @@ export function GanttChart({
   rangeEnd.setUTCDate(rangeEnd.getUTCDate() + 3);
 
   const ticks = weeklyTicks(rangeStart, rangeEnd);
+  const days = enumerateDays(rangeStart, rangeEnd);
   const todayPct = pct(cutoffDate, rangeStart, rangeEnd);
 
   return (
@@ -68,10 +84,37 @@ export function GanttChart({
 
         {/* Rows */}
         <div className="relative">
+          {/* Day grid: weekend shading + a vertical line per day, behind everything else */}
+          {days.map((day, i) => {
+            const isWeekend = day.getUTCDay() === 0 || day.getUTCDay() === 6;
+            if (!isWeekend) return null;
+            const nextDay = new Date(day);
+            nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+            const leftPct = pct(day, rangeStart, rangeEnd);
+            const rightPct = pct(nextDay, rangeStart, rangeEnd);
+            return (
+              <div
+                key={`weekend-${i}`}
+                className="pointer-events-none absolute top-0 bottom-0 bg-neutral-50"
+                style={{
+                  left: timelineLeft(leftPct),
+                  width: `calc((100% - ${LABEL_COL_WIDTH}px) * ${(rightPct - leftPct) / 100})`,
+                }}
+              />
+            );
+          })}
+          {days.map((day, i) => (
+            <div
+              key={`gridline-${i}`}
+              className="pointer-events-none absolute top-0 bottom-0 w-px bg-neutral-100"
+              style={{ left: timelineLeft(pct(day, rangeStart, rangeEnd)) }}
+            />
+          ))}
+
           {/* Today line spans the whole body */}
           <div
             className="pointer-events-none absolute top-0 bottom-0 z-10 w-px bg-red-500"
-            style={{ left: `calc(${LABEL_COL_WIDTH}px + (100% - ${LABEL_COL_WIDTH}px) * ${todayPct / 100})` }}
+            style={{ left: timelineLeft(todayPct) }}
           >
             <span className="absolute -top-0 left-1 rounded-sm bg-red-500 px-1 text-[9px] font-bold whitespace-nowrap text-white">
               HOJE

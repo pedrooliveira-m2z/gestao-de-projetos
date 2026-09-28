@@ -260,6 +260,11 @@ function GanttPage({ view }: { view: ProjectView }) {
     weekTicks.push(new Date(t));
   }
 
+  const dayTicks: Date[] = [];
+  for (let t = new Date(start); t <= end; t.setUTCDate(t.getUTCDate() + 1)) {
+    dayTicks.push(new Date(t));
+  }
+
   const todayX = x(view.cutoffDate);
 
   return (
@@ -280,6 +285,33 @@ function GanttPage({ view }: { view: ProjectView }) {
             fill="#ffffff"
             stroke={BORDER}
           />
+          {dayTicks.map((tick, i) => {
+            const isWeekend = tick.getUTCDay() === 0 || tick.getUTCDay() === 6;
+            if (!isWeekend) return null;
+            const next = new Date(tick);
+            next.setUTCDate(next.getUTCDate() + 1);
+            return (
+              <Rect
+                key={`weekend-${i}`}
+                x={labelWidth + x(tick)}
+                y={0}
+                width={Math.max(0, x(next) - x(tick))}
+                height={chartHeight}
+                fill="#f5f5f5"
+              />
+            );
+          })}
+          {dayTicks.map((tick, i) => (
+            <Line
+              key={`day-${i}`}
+              x1={labelWidth + x(tick)}
+              y1={0}
+              x2={labelWidth + x(tick)}
+              y2={chartHeight}
+              stroke="#f0f0f0"
+              strokeWidth={0.4}
+            />
+          ))}
           {weekTicks.map((tick, i) => (
             <Line
               key={i}
