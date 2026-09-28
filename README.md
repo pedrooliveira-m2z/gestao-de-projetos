@@ -19,7 +19,9 @@ pelo time.
 1. Copie `.env.example` para `.env` e preencha:
    - `DATABASE_URL`: string de conexão Postgres (Neon, Vercel Postgres, etc.)
    - `AUTH_SECRET`: gere com `openssl rand -base64 33`
-   - `CLICKUP_API_TOKEN`: token pessoal em **ClickUp → Configurações → Apps**
+   - `CLICKUP_API_TOKEN` (opcional): só serve de fallback para dev local — o token normal é
+     conectado pela própria interface em **Administração → ClickUp** (`/admin/clickup`), fica
+     salvo no banco e pode ser trocado sem precisar mexer em variável de ambiente/redeploy.
 
 2. Instale as dependências e gere o client do Prisma:
 
@@ -40,6 +42,21 @@ pelo time.
    ```bash
    npm run dev
    ```
+
+## Conectar o ClickUp e importar tarefas
+
+Em **ClickUp** no menu (`/admin/clickup`):
+
+1. Cole um token pessoal (ClickUp → avatar → Configurações → Apps → API Token) e clique em
+   Conectar. O token é validado na hora e salvo no banco.
+2. A página lista todos os espaços e listas do workspace com o ID de cada lista (para copiar).
+3. Em **Administração → editar projeto**, cada frente ganha um campo "Importar tarefas do
+   ClickUp": cole o ID de uma lista e clique em Importar/sincronizar. Isso cria uma `Deliverable`
+   para cada tarefa da lista (gatilho `CLICKUP_ONLY`, sem regra de SLA) e, ao rodar de novo,
+   atualiza o nome das que já existem em vez de duplicar. O status e o vencimento de cada tarefa
+   continuam sendo puxados ao vivo da API do ClickUp toda vez que a página/PDF é carregada.
+4. Depois de importar, cada entrega pode ser editada normalmente para receber uma regra de SLA de
+   verdade (gatilho + nº de dias), se o prazo contratual não for só o vencimento do ClickUp.
 
 ## Modelo de dados (resumo)
 

@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TopNav } from "@/components/TopNav";
 import { formatFullDate } from "@/lib/format";
+import { getClickupToken } from "@/lib/clickup";
+import { importClickupListAction } from "../../clickup/actions";
 import {
   addDeliverableAction,
   addFrontAction,
@@ -29,6 +32,7 @@ export default async function AdminProjectPage({
   });
   if (!project) notFound();
 
+  const clickupConnected = !!(await getClickupToken());
   const updateCutoff = updateCutoffAction.bind(null, project.id);
   const addFront = addFrontAction.bind(null, project.id);
 
@@ -43,6 +47,16 @@ export default async function AdminProjectPage({
         <p className="mt-1 text-sm text-neutral-500">
           Briefing em {formatFullDate(project.briefingDate)}
         </p>
+
+        {!clickupConnected && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            ClickUp não conectado.{" "}
+            <Link href="/admin/clickup" className="font-semibold underline">
+              Conectar agora
+            </Link>{" "}
+            para puxar status ao vivo e importar tarefas.
+          </div>
+        )}
 
         <form action={updateCutoff} className="mt-4 flex items-end gap-2">
           <div className="flex flex-col gap-1">
@@ -66,6 +80,7 @@ export default async function AdminProjectPage({
           {project.fronts.map((front) => {
             const addDeliverable = addDeliverableAction.bind(null, project.id, front.id);
             const deleteFront = deleteFrontAction.bind(null, project.id, front.id);
+            const importFromClickup = importClickupListAction.bind(null, project.id, front.id);
             return (
               <div key={front.id} className="rounded-lg border border-neutral-200 bg-white">
                 <div
@@ -102,6 +117,38 @@ export default async function AdminProjectPage({
                     );
                   })}
                 </div>
+
+                {clickupConnected && (
+                  <form
+                    action={importFromClickup}
+                    className="flex items-end gap-2 border-t border-neutral-200 bg-neutral-50 p-3"
+                  >
+                    <div className="flex flex-1 flex-col gap-1">
+                      <label className="text-xs font-medium text-neutral-600">
+                        Importar tarefas do ClickUp (ID da lista)
+                      </label>
+                      <input
+                        name="listId"
+                        placeholder="ID da lista"
+                        defaultValue={front.clickupListId ?? ""}
+                        required
+                        className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold hover:border-neutral-500"
+                    >
+                      Importar / sincronizar
+                    </button>
+                    <Link
+                      href="/admin/clickup"
+                      className="text-xs text-neutral-500 underline"
+                    >
+                      ver listas
+                    </Link>
+                  </form>
+                )}
 
                 <form
                   action={addDeliverable}

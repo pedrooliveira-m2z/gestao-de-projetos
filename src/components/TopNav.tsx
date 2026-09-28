@@ -16,9 +16,14 @@ export async function TopNav() {
           Painéis
         </Link>
         {(role === "ADMIN" || role === "INTERNAL") && (
-          <Link href="/admin" className="text-neutral-300 hover:text-white">
-            Administração
-          </Link>
+          <>
+            <Link href="/admin" className="text-neutral-300 hover:text-white">
+              Administração
+            </Link>
+            <Link href="/admin/clickup" className="text-neutral-300 hover:text-white">
+              ClickUp
+            </Link>
+          </>
         )}
         {session?.user && (
           <form

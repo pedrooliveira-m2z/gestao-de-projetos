@@ -63,10 +63,10 @@ export async function loadProjectView(projectId: string): Promise<ProjectView | 
     .map((d) => d.clickupTaskId)
     .filter((id): id is string => !!id);
 
-  let clickupTasksRaw = new Map<string, ClickupTask>();
-  if (taskIds.length > 0 && process.env.CLICKUP_API_TOKEN) {
-    clickupTasksRaw = await getTasks(taskIds).catch(() => clickupTasksRaw);
-  }
+  const clickupTasksRaw =
+    taskIds.length > 0
+      ? await getTasks(taskIds).catch(() => new Map<string, ClickupTask>())
+      : new Map<string, ClickupTask>();
   const clickupMap: Map<string, ClickupSnapshot> = new Map(
     Array.from(clickupTasksRaw.entries()).map(([id, task]) => [
       id,

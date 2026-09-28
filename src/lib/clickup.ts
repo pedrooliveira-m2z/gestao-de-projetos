@@ -1,7 +1,12 @@
 // Thin server-side client for the ClickUp REST API (v2).
-// Requires CLICKUP_API_TOKEN in the environment (Settings > Apps > API Token in ClickUp).
+// The API token is stored in the Setting table (configured from /admin/clickup) so it can be
+// managed from the site itself; CLICKUP_API_TOKEN in the environment is used as a fallback for
+// local development.
+
+import { prisma } from "./prisma";
 
 const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
+const TOKEN_SETTING_KEY = "clickup_api_token";
 
 export interface ClickupTask {
   id: string;
@@ -12,20 +17,46 @@ export interface ClickupTask {
   list: { id: string; name: string };
 }
 
-function getToken(): string {
-  const token = process.env.CLICKUP_API_TOKEN;
-  if (!token) {
-    throw new Error(
-      "CLICKUP_API_TOKEN não configurado. Defina essa variável de ambiente com um token pessoal do ClickUp."
-    );
-  }
-  return token;
+export interface ClickupTeam {
+  id: string;
+  name: string;
 }
 
-async function clickupFetch<T>(path: string): Promise<T> {
+export interface ClickupSpace {
+  id: string;
+  name: string;
+}
+
+export interface ClickupFolder {
+  id: string;
+  name: string;
+}
+
+export interface ClickupList {
+  id: string;
+  name: string;
+}
+
+export async function getClickupToken(): Promise<string | null> {
+  const setting = await prisma.setting.findUnique({ where: { key: TOKEN_SETTING_KEY } });
+  return setting?.value || process.env.CLICKUP_API_TOKEN || null;
+}
+
+export async function saveClickupToken(token: string): Promise<void> {
+  await prisma.setting.upsert({
+    where: { key: TOKEN_SETTING_KEY },
+    update: { value: token },
+    create: { key: TOKEN_SETTING_KEY, value: token },
+  });
+}
+
+export async function clearClickupToken(): Promise<void> {
+  await prisma.setting.deleteMany({ where: { key: TOKEN_SETTING_KEY } });
+}
+
+async function clickupFetch<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${CLICKUP_API_BASE}${path}`, {
-    headers: { Authorization: getToken() },
-    // ClickUp task status changes frequently; never cache stale data.
+    headers: { Authorization: token },
     cache: "no-store",
   });
   if (!res.ok) {
@@ -35,13 +66,71 @@ async function clickupFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function getTask(taskId: string): Promise<ClickupTask> {
-  return clickupFetch<ClickupTask>(`/task/${taskId}`);
+export async function getAuthorizedUser(
+  token: string
+): Promise<{ id: number; username: string; email: string }> {
+  const data = await clickupFetch<{ user: { id: number; username: string; email: string } }>(
+    "/user",
+    token
+  );
+  return data.user;
+}
+
+export async function listTeams(token: string): Promise<ClickupTeam[]> {
+  const data = await clickupFetch<{ teams: ClickupTeam[] }>("/team", token);
+  return data.teams;
+}
+
+export async function listSpaces(token: string, teamId: string): Promise<ClickupSpace[]> {
+  const data = await clickupFetch<{ spaces: ClickupSpace[] }>(
+    `/team/${teamId}/space?archived=false`,
+    token
+  );
+  return data.spaces;
+}
+
+export async function listFolders(token: string, spaceId: string): Promise<ClickupFolder[]> {
+  const data = await clickupFetch<{ folders: ClickupFolder[] }>(
+    `/space/${spaceId}/folder?archived=false`,
+    token
+  );
+  return data.folders;
+}
+
+export async function listFolderlessLists(token: string, spaceId: string): Promise<ClickupList[]> {
+  const data = await clickupFetch<{ lists: ClickupList[] }>(
+    `/space/${spaceId}/list?archived=false`,
+    token
+  );
+  return data.lists;
+}
+
+export async function listListsInFolder(token: string, folderId: string): Promise<ClickupList[]> {
+  const data = await clickupFetch<{ lists: ClickupList[] }>(
+    `/folder/${folderId}/list?archived=false`,
+    token
+  );
+  return data.lists;
+}
+
+export async function listTasksInList(token: string, listId: string): Promise<ClickupTask[]> {
+  const data = await clickupFetch<{ tasks: ClickupTask[] }>(
+    `/list/${listId}/task?include_closed=true&subtasks=false`,
+    token
+  );
+  return data.tasks;
+}
+
+export async function getTask(taskId: string, token: string): Promise<ClickupTask> {
+  return clickupFetch<ClickupTask>(`/task/${taskId}`, token);
 }
 
 export async function getTasks(taskIds: string[]): Promise<Map<string, ClickupTask>> {
-  const results = await Promise.allSettled(taskIds.map((id) => getTask(id)));
+  const token = await getClickupToken();
   const map = new Map<string, ClickupTask>();
+  if (!token || taskIds.length === 0) return map;
+
+  const results = await Promise.allSettled(taskIds.map((id) => getTask(id, token)));
   results.forEach((result, index) => {
     if (result.status === "fulfilled") {
       map.set(taskIds[index], result.value);

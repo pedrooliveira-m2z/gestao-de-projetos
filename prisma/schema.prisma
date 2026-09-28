@@ -69,14 +69,15 @@ model Project {
 }
 
 model Front {
-  id           String       @id @default(cuid())
-  projectId    String
-  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name         String
-  vendorName   String
-  colorHex     String       @default("#2563eb")
-  order        Int          @default(0)
-  deliverables Deliverable[]
+  id            String        @id @default(cuid())
+  projectId     String
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  vendorName    String
+  colorHex      String        @default("#2563eb")
+  order         Int           @default(0)
+  clickupListId String?
+  deliverables  Deliverable[]
 }
 
 model Deliverable {
@@ -110,6 +111,13 @@ model ReportSnapshot {
   cutoffDate  DateTime
   generatedAt DateTime @default(now())
   data        Json
+}
+
+/// Chave-valor simples para configurações globais (ex: token da API do ClickUp).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model ClickupTaskCache {
