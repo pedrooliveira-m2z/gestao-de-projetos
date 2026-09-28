@@ -9,6 +9,7 @@ import {
   getClickupToken,
   listTasksInList,
   saveClickupToken,
+  saveClientsListId,
 } from "@/lib/clickup";
 
 async function assertInternal() {
@@ -34,6 +35,15 @@ export async function saveClickupTokenAction(
   } catch {
     return { error: "Token inválido ou sem permissão. Confira em ClickUp → Configurações → Apps.", success: null };
   }
+}
+
+export async function saveClientsListIdAction(formData: FormData) {
+  await assertInternal();
+  const listId = String(formData.get("clientsListId") ?? "").trim();
+  if (!listId) throw new Error("Informe o ID da lista.");
+  await saveClientsListId(listId);
+  revalidatePath("/admin/clickup");
+  revalidatePath("/admin");
 }
 
 export async function disconnectClickupAction() {

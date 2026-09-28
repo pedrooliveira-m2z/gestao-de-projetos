@@ -14,6 +14,13 @@ async function assertInternal() {
   }
 }
 
+async function assertAdmin() {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    throw new Error("Só administradores podem fazer isso.");
+  }
+}
+
 export async function createProjectAction(formData: FormData) {
   await assertInternal();
 
@@ -44,6 +51,13 @@ export async function createProjectAction(formData: FormData) {
 
   revalidatePath("/admin");
   redirect(`/admin/projects/${project.id}`);
+}
+
+export async function deleteClientAction(clientId: string) {
+  await assertAdmin();
+  await prisma.client.delete({ where: { id: clientId } });
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }
 
 export async function updateCutoffAction(projectId: string, formData: FormData) {

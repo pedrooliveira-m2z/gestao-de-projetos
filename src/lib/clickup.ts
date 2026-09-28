@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 
 const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
 const TOKEN_SETTING_KEY = "clickup_api_token";
+const CLIENTS_LIST_SETTING_KEY = "clickup_clients_list_id";
 
 export interface ClickupTask {
   id: string;
@@ -52,6 +53,29 @@ export async function saveClickupToken(token: string): Promise<void> {
 
 export async function clearClickupToken(): Promise<void> {
   await prisma.setting.deleteMany({ where: { key: TOKEN_SETTING_KEY } });
+}
+
+/** ID of a ClickUp list whose task names are used to suggest client names when creating a project. */
+export async function getClientsListId(): Promise<string | null> {
+  const setting = await prisma.setting.findUnique({ where: { key: CLIENTS_LIST_SETTING_KEY } });
+  return setting?.value || null;
+}
+
+export async function saveClientsListId(listId: string): Promise<void> {
+  await prisma.setting.upsert({
+    where: { key: CLIENTS_LIST_SETTING_KEY },
+    update: { value: listId },
+    create: { key: CLIENTS_LIST_SETTING_KEY, value: listId },
+  });
+}
+
+/** Names of clients tracked in the ClickUp clients list, for autocomplete — fetched live, never cached. */
+export async function listClickupClientNames(): Promise<string[]> {
+  const token = await getClickupToken();
+  const listId = await getClientsListId();
+  if (!token || !listId) return [];
+  const tasks = await listTasksInList(token, listId).catch(() => [] as ClickupTask[]);
+  return tasks.map((t) => t.name).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
 async function clickupFetch<T>(path: string, token: string): Promise<T> {
