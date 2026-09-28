@@ -69,15 +69,21 @@ model Project {
 }
 
 model Front {
-  id            String        @id @default(cuid())
-  projectId     String
-  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name          String
-  vendorName    String
-  colorHex      String        @default("#2563eb")
-  order         Int           @default(0)
-  clickupListId String?
-  deliverables  Deliverable[]
+  id                  String        @id @default(cuid())
+  projectId           String
+  project             Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                String
+  vendorName          String
+  colorHex            String        @default("#2563eb")
+  order               Int           @default(0)
+  clickupListId       String?
+  contractFileUrl     String?
+  contractFileName    String?
+  contractUploadedAt  DateTime?
+  /// Sugestões de regras de prazo extraídas do contrato pela IA (revisadas antes de virar Deliverable).
+  contractAnalysis    Json?
+  contractAnalyzedAt  DateTime?
+  deliverables        Deliverable[]
 }
 
 model Deliverable {

@@ -5,7 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { TopNav } from "@/components/TopNav";
 import { formatFullDate } from "@/lib/format";
 import { getClickupToken } from "@/lib/clickup";
+import type { ContractSuggestion } from "@/lib/contract-analysis";
 import { importClickupListAction } from "../../clickup/actions";
+import { ContractUploadForm } from "../../contract/ContractUploadForm";
+import { SuggestionsReview } from "../../contract/SuggestionsReview";
 import {
   addDeliverableAction,
   addFrontAction,
@@ -150,6 +153,32 @@ export default async function AdminProjectPage({
                   </form>
                 )}
 
+                <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 p-3">
+                  <ContractUploadForm
+                    frontId={front.id}
+                    projectId={project.id}
+                    hasContract={!!front.contractFileUrl}
+                  />
+                  {front.contractFileUrl && (
+                    <a
+                      href={front.contractFileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 underline"
+                    >
+                      Ver contrato atual ({front.contractFileName})
+                    </a>
+                  )}
+                </div>
+
+                {front.contractAnalysis != null && (
+                  <SuggestionsReview
+                    projectId={project.id}
+                    frontId={front.id}
+                    suggestions={front.contractAnalysis as unknown as ContractSuggestion[]}
+                  />
+                )}
+
                 <form
                   action={addDeliverable}
                   className="grid gap-2 border-t border-neutral-200 p-4 sm:grid-cols-3"
@@ -247,6 +276,10 @@ export default async function AdminProjectPage({
 
         <section className="mt-8">
           <h2 className="text-sm font-bold text-neutral-700 uppercase">Nova frente</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Depois de criar, a frente aparece na lista acima com um campo para anexar o contrato —
+            a IA lê o arquivo e sugere as regras de prazo de cada entrega.
+          </p>
           <form
             action={addFront}
             className="mt-3 grid gap-2 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-4"
