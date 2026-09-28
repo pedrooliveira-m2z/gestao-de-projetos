@@ -110,7 +110,11 @@ export function computeDeliverableTimeline(
       : null;
 
   const doneStatuses = clickup?.doneStatuses ?? ["concluído", "concluido", "done", "closed"];
-  const clickupDone = clickup ? doneStatuses.includes(clickup.status.toLowerCase()) : false;
+  // Sem tarefa do ClickUp vinculada, o único sinal de conclusão disponível é a situação manual
+  // cadastrada (ex: "concluído"). Com ClickUp vinculado, a situação real do ClickUp manda.
+  const isDone = clickup
+    ? doneStatuses.includes(clickup.status.toLowerCase())
+    : doneStatuses.includes((deliverable.manualStatusLabel ?? "").toLowerCase());
 
   // Referência operacional: vencimento real no ClickUp, ou (se não há SLA contratual) a data
   // manual cadastrada, que nesse caso só representa um prazo operacional.
@@ -118,7 +122,7 @@ export function computeDeliverableTimeline(
     clickup?.dueDate ?? (!isContractualDeadline ? deliverable.endDateOverride ?? null : null);
 
   let status: DeliverableStatus;
-  if (clickupDone) {
+  if (isDone) {
     status = "CONCLUIDO";
   } else if (isContractualDeadline && deadline && deadline < cutoffDate) {
     // Passou do prazo contratual calculado a partir do gatilho, sem sinal de conclusão.
