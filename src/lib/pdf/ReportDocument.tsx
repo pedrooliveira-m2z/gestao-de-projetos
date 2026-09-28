@@ -246,10 +246,16 @@ function GanttPage({ view }: { view: ProjectView }) {
   const flatRows: Array<
     | { kind: "front"; front: FrontView }
     | { kind: "deliverable"; front: FrontView; deliverable: FrontView["deliverables"][number] }
+    | { kind: "approval"; front: FrontView; deliverable: FrontView["deliverables"][number] }
   > = [];
   view.fronts.forEach((front) => {
     flatRows.push({ kind: "front", front });
-    front.deliverables.forEach((deliverable) => flatRows.push({ kind: "deliverable", front, deliverable }));
+    front.deliverables.forEach((deliverable) => {
+      flatRows.push({ kind: "deliverable", front, deliverable });
+      if (deliverable.hasApprovalWindow && deliverable.approvalWindowStart && deliverable.ganttEnd) {
+        flatRows.push({ kind: "approval", front, deliverable });
+      }
+    });
   });
 
   const chartHeight = headerHeight + flatRows.length * rowHeight;
@@ -347,8 +353,23 @@ function GanttPage({ view }: { view: ProjectView }) {
                 />
               );
             }
-            const d = row.deliverable;
             const barY = y + rowHeight / 2 - 3.5;
+            if (row.kind === "approval") {
+              const d = row.deliverable;
+              return (
+                <Rect
+                  key={i}
+                  x={labelWidth + x(d.approvalWindowStart!)}
+                  y={barY}
+                  width={Math.max(2, x(d.ganttEnd!) - x(d.approvalWindowStart!))}
+                  height={7}
+                  rx={1.5}
+                  fill="#9ca3af"
+                  fillOpacity={0.5}
+                />
+              );
+            }
+            const d = row.deliverable;
             return (
               <React.Fragment key={i}>
                 {d.kind === "MILESTONE" && d.ganttEnd ? (
@@ -359,27 +380,14 @@ function GanttPage({ view }: { view: ProjectView }) {
                 ) : (
                   d.ganttStart &&
                   d.ganttEnd && (
-                    <>
-                      <Rect
-                        x={labelWidth + x(d.ganttStart)}
-                        y={barY}
-                        width={Math.max(2, x(d.ganttEnd) - x(d.ganttStart))}
-                        height={7}
-                        rx={1.5}
-                        fill={d.colorHex}
-                      />
-                      {d.hasApprovalWindow && d.approvalWindowStart && (
-                        <Rect
-                          x={labelWidth + x(d.approvalWindowStart)}
-                          y={barY}
-                          width={Math.max(2, x(d.ganttEnd) - x(d.approvalWindowStart))}
-                          height={7}
-                          rx={1.5}
-                          fill="#9ca3af"
-                          fillOpacity={0.5}
-                        />
-                      )}
-                    </>
+                    <Rect
+                      x={labelWidth + x(d.ganttStart)}
+                      y={barY}
+                      width={Math.max(2, x(d.ganttEnd) - x(d.ganttStart))}
+                      height={7}
+                      rx={1.5}
+                      fill={d.colorHex}
+                    />
                   )
                 )}
               </React.Fragment>
@@ -394,6 +402,10 @@ function GanttPage({ view }: { view: ProjectView }) {
               {row.kind === "front" ? (
                 <Text style={{ fontSize: 7, fontWeight: 700, color: "#fff", paddingLeft: 4 }}>
                   {row.front.vendorName} — {row.front.name}
+                </Text>
+              ) : row.kind === "approval" ? (
+                <Text style={{ fontSize: 6, color: MUTED, fontStyle: "italic", paddingLeft: 12, width: labelWidth - 14 }}>
+                  ↳ Aprovação do cliente
                 </Text>
               ) : (
                 <Text style={{ fontSize: 6.5, color: "#374151", paddingLeft: 4, width: labelWidth - 8 }}>

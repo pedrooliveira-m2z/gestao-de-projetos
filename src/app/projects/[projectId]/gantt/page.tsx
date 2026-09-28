@@ -12,9 +12,10 @@ export default async function ProjectGanttPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  await assertProjectAccess(projectId);
+  const { session } = await assertProjectAccess(projectId);
   const view = await loadProjectView(projectId);
   if (!view) notFound();
+  const canEdit = session?.user?.role === "ADMIN" || session?.user?.role === "INTERNAL";
 
   return (
     <div className="min-h-screen">
@@ -36,7 +37,12 @@ export default async function ProjectGanttPage({
       <main className="mx-auto max-w-6xl px-6 py-8">
         <ProjectTabs projectId={view.id} active="gantt" />
         <div className="mt-6">
-          <GanttChart fronts={view.fronts} cutoffDate={view.cutoffDate} />
+          <GanttChart
+            fronts={view.fronts}
+            cutoffDate={view.cutoffDate}
+            projectId={view.id}
+            canEdit={canEdit}
+          />
           <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
             {view.fronts.map((f) => (
               <span key={f.id} className="inline-flex items-center gap-1.5">

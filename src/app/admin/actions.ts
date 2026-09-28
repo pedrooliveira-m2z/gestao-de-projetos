@@ -148,6 +148,25 @@ export async function deleteDeliverableAction(projectId: string, deliverableId: 
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function updateDeliverableDatesAction(
+  projectId: string,
+  deliverableId: string,
+  data: { startDateOverride?: string | null; endDateOverride?: string | null }
+) {
+  await assertInternal();
+  const updateData: { startDateOverride?: Date | null; endDateOverride?: Date | null } = {};
+  if ("startDateOverride" in data) {
+    updateData.startDateOverride = data.startDateOverride ? new Date(data.startDateOverride) : null;
+  }
+  if ("endDateOverride" in data) {
+    updateData.endDateOverride = data.endDateOverride ? new Date(data.endDateOverride) : null;
+  }
+  await prisma.deliverable.update({ where: { id: deliverableId }, data: updateData });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function updateDeliverableColorAction(
   projectId: string,
   deliverableId: string,
