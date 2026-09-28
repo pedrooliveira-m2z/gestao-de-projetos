@@ -106,8 +106,10 @@ export default async function ClickupAdminPage() {
               Lista de clientes no ClickUp
             </h2>
             <p className="mt-1 text-xs text-neutral-500">
-              Aponte para a lista do ClickUp que tem um cliente por tarefa. Os nomes aparecem como
-              sugestão ao criar um cliente novo em Administração, sempre atualizados.
+              Aponte para a lista do ClickUp que tem um cliente por tarefa. Só entram na sugestão
+              as tarefas com status <code className="rounded bg-neutral-100 px-1">ativo</code> —
+              as demais (sub-tarefas operacionais dentro da mesma lista) ficam de fora
+              automaticamente.
             </p>
             <form action={saveClientsListIdAction} className="mt-3 flex items-end gap-2">
               <div className="flex flex-1 flex-col gap-1">

@@ -69,13 +69,22 @@ export async function saveClientsListId(listId: string): Promise<void> {
   });
 }
 
-/** Names of clients tracked in the ClickUp clients list, for autocomplete — fetched live, never cached. */
+/**
+ * Names of active clients tracked in the ClickUp clients list, for autocomplete — fetched live,
+ * never cached. Only tasks whose ClickUp status is "ativo" count as a client record; everything
+ * else in that list is an operational sub-task (ex: "[Cliente] Ajuste site").
+ */
 export async function listClickupClientNames(): Promise<string[]> {
   const token = await getClickupToken();
   const listId = await getClientsListId();
   if (!token || !listId) return [];
-  const tasks = await listTasksInList(token, listId).catch(() => [] as ClickupTask[]);
-  return tasks.map((t) => t.name).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const tasks = await listTasksInList(token, listId, { statuses: ["ativo"] }).catch(
+    () => [] as ClickupTask[]
+  );
+  const names = tasks
+    .filter((t) => t.status.status.toLowerCase() === "ativo")
+    .map((t) => t.name);
+  return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
 async function clickupFetch<T>(path: string, token: string): Promise<T> {
@@ -137,12 +146,32 @@ export async function listListsInFolder(token: string, folderId: string): Promis
   return data.lists;
 }
 
-export async function listTasksInList(token: string, listId: string): Promise<ClickupTask[]> {
-  const data = await clickupFetch<{ tasks: ClickupTask[] }>(
-    `/list/${listId}/task?include_closed=true&subtasks=false`,
-    token
-  );
-  return data.tasks;
+export async function listTasksInList(
+  token: string,
+  listId: string,
+  options?: { statuses?: string[] }
+): Promise<ClickupTask[]> {
+  const all: ClickupTask[] = [];
+  let page = 0;
+  // ClickUp paginates at 100 tasks per page; keep pulling until the list is exhausted.
+  for (;;) {
+    const params = new URLSearchParams({
+      include_closed: "true",
+      subtasks: "false",
+      page: String(page),
+    });
+    for (const status of options?.statuses ?? []) {
+      params.append("statuses[]", status);
+    }
+    const data = await clickupFetch<{ tasks: ClickupTask[] }>(
+      `/list/${listId}/task?${params.toString()}`,
+      token
+    );
+    all.push(...data.tasks);
+    if (data.tasks.length < 100) break;
+    page += 1;
+  }
+  return all;
 }
 
 export async function getTask(taskId: string, token: string): Promise<ClickupTask> {
