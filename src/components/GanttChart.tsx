@@ -8,6 +8,8 @@ import {
   updateDeliverableApprovalWindowAction,
   addDeliverableAction,
   reorderDeliverablesAction,
+  updateDeliverableNameAction,
+  deleteDeliverableAction,
 } from "@/app/admin/actions";
 
 const LABEL_COL_WIDTH = 260;
@@ -242,6 +244,16 @@ export function GanttChart({
   const [orderOverrides, setOrderOverrides] = useState<Record<string, string[]>>({});
   const [reorderedFronts, setReorderedFronts] = useState<Record<string, boolean>>({});
   const dragDeliverableRef = useRef<{ frontId: string; id: string } | null>(null);
+  const [pendingNames, setPendingNames] = useState<Record<string, string>>({});
+
+  function stageName(id: string, name: string) {
+    setPendingNames((prev) => ({ ...prev, [id]: name }));
+  }
+
+  async function removeDeliverable(id: string, name: string) {
+    if (!window.confirm(`Remover a entrega "${name}"? Essa ação não pode ser desfeita.`)) return;
+    await deleteDeliverableAction(projectId, id);
+  }
 
   function orderedDeliverables(front: FrontView): DeliverableView[] {
     const order = orderOverrides[front.id];
@@ -323,10 +335,14 @@ export function GanttChart({
     }));
   }
 
+  const nameById = new Map(fronts.flatMap((f) => f.deliverables).map((d) => [d.id, d.name]));
+  const dirtyNameIds = Object.keys(pendingNames).filter((id) => pendingNames[id] !== nameById.get(id));
+
   const pendingCount =
     Object.keys(pendingDateFields).length +
     Object.keys(pendingApprovalFields).length +
-    Object.keys(reorderedFronts).length;
+    Object.keys(reorderedFronts).length +
+    dirtyNameIds.length;
 
   useEffect(() => {
     if (pendingCount === 0) return;
@@ -359,6 +375,7 @@ export function GanttChart({
           if (!order) return Promise.resolve();
           return reorderDeliverablesAction(projectId, frontId, order);
         }),
+        ...dirtyNameIds.map((id) => updateDeliverableNameAction(projectId, id, pendingNames[id])),
       ]);
       setOverrides({});
       setApprovalOverrides({});
@@ -366,6 +383,7 @@ export function GanttChart({
       setPendingApprovalFields({});
       setOrderOverrides({});
       setReorderedFronts({});
+      setPendingNames({});
     });
   }
 
@@ -376,6 +394,7 @@ export function GanttChart({
     setPendingApprovalFields({});
     setOrderOverrides({});
     setReorderedFronts({});
+    setPendingNames({});
   }
 
   function addRow(frontId: string, formData: FormData) {
@@ -570,10 +589,28 @@ export function GanttChart({
                             ⠿
                           </span>
                         )}
-                        <div>
-                          <p className="text-sm font-medium text-neutral-800">{d.name}</p>
+                        <div className="min-w-0 flex-1">
+                          {canEdit ? (
+                            <input
+                              value={pendingNames[d.id] ?? d.name}
+                              onChange={(e) => stageName(d.id, e.target.value)}
+                              className="w-full rounded border border-transparent bg-transparent px-1 -mx-1 text-sm font-medium text-neutral-800 hover:border-neutral-200 focus:border-neutral-400 focus:bg-white focus:outline-none"
+                            />
+                          ) : (
+                            <p className="text-sm font-medium text-neutral-800">{d.name}</p>
+                          )}
                           {d.ruleLabel && <p className="text-[11px] text-neutral-400">{d.ruleLabel}</p>}
                         </div>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => removeDeliverable(d.id, d.name)}
+                            title="Remover entrega"
+                            className="shrink-0 text-sm leading-none text-neutral-300 hover:text-red-600"
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                       <DeliverableBar
                         kind={d.kind}

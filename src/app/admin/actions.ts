@@ -152,6 +152,20 @@ export async function deleteDeliverableAction(projectId: string, deliverableId: 
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function updateDeliverableNameAction(
+  projectId: string,
+  deliverableId: string,
+  name: string
+) {
+  await assertInternal();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Nome da entrega não pode ficar vazio.");
+  await prisma.deliverable.update({ where: { id: deliverableId }, data: { name: trimmed } });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function reorderDeliverablesAction(
   projectId: string,
   frontId: string,
