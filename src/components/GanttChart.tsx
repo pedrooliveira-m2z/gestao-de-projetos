@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { FrontView, DeliverableView } from "@/lib/project-data";
 import { formatShortDate } from "@/lib/format";
-import { updateDeliverableDatesAction, updateDeliverableApprovalWindowAction } from "@/app/admin/actions";
+import {
+  updateDeliverableDatesAction,
+  updateDeliverableApprovalWindowAction,
+  addDeliverableAction,
+} from "@/app/admin/actions";
 
 const LABEL_COL_WIDTH = 260;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -232,6 +236,8 @@ export function GanttChart({
   const [pendingDateFields, setPendingDateFields] = useState<Record<string, DragFields>>({});
   const [pendingApprovalFields, setPendingApprovalFields] = useState<Record<string, DragFields>>({});
   const [isSaving, startSaving] = useTransition();
+  const [addingRowFor, setAddingRowFor] = useState<string | null>(null);
+  const [isAddingRow, startAddingRow] = useTransition();
 
   const allDates = fronts
     .flatMap((f) => f.deliverables)
@@ -315,6 +321,14 @@ export function GanttChart({
     setApprovalOverrides({});
     setPendingDateFields({});
     setPendingApprovalFields({});
+  }
+
+  function addRow(frontId: string, formData: FormData) {
+    startAddingRow(async () => {
+      formData.set("triggerType", "MANUAL");
+      await addDeliverableAction(projectId, frontId, formData);
+      setAddingRowFor(null);
+    });
   }
 
   return (
@@ -478,6 +492,63 @@ export function GanttChart({
                   </div>
                 );
               })}
+              {canEdit &&
+                (addingRowFor === front.id ? (
+                  <form
+                    action={(formData) => addRow(front.id, formData)}
+                    className="flex flex-wrap items-center gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-2"
+                  >
+                    <input
+                      name="name"
+                      placeholder="Nome da linha"
+                      required
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                    />
+                    <select
+                      name="kind"
+                      defaultValue="BAR"
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                    >
+                      <option value="BAR">Barra (início + fim)</option>
+                      <option value="MILESTONE">Marco (só data final)</option>
+                    </select>
+                    <input
+                      type="date"
+                      name="startDateOverride"
+                      title="Início (ignorado para marco)"
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                    />
+                    <input
+                      type="date"
+                      name="endDateOverride"
+                      required
+                      title="Fim / data do marco"
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isAddingRow}
+                      className="rounded-md bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black disabled:opacity-60"
+                    >
+                      {isAddingRow ? "Adicionando..." : "Adicionar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddingRowFor(null)}
+                      className="text-xs text-neutral-400 hover:underline"
+                    >
+                      cancelar
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddingRowFor(front.id)}
+                    className="w-full border-b border-neutral-100 px-4 py-1.5 text-left text-[11px] text-neutral-400 hover:bg-neutral-50 hover:text-neutral-600"
+                  >
+                    + Adicionar linha
+                  </button>
+                ))}
             </div>
           ))}
         </div>
