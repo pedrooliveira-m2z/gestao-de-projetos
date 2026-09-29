@@ -7,6 +7,7 @@ import {
   updateDeliverableDatesAction,
   updateDeliverableApprovalWindowAction,
   addDeliverableAction,
+  reorderDeliverablesAction,
 } from "@/app/admin/actions";
 
 const LABEL_COL_WIDTH = 260;
@@ -238,6 +239,48 @@ export function GanttChart({
   const [isSaving, startSaving] = useTransition();
   const [addingRowFor, setAddingRowFor] = useState<string | null>(null);
   const [isAddingRow, startAddingRow] = useTransition();
+  const [orderOverrides, setOrderOverrides] = useState<Record<string, string[]>>({});
+  const [reorderedFronts, setReorderedFronts] = useState<Record<string, boolean>>({});
+  const dragDeliverableRef = useRef<{ frontId: string; id: string } | null>(null);
+
+  function orderedDeliverables(front: FrontView): DeliverableView[] {
+    const order = orderOverrides[front.id];
+    if (!order) return front.deliverables;
+    const byId = new Map(front.deliverables.map((d) => [d.id, d]));
+    const known = order.map((id) => byId.get(id)).filter((d): d is DeliverableView => !!d);
+    // Any deliverable not in the stored order (e.g. just added) goes at the end.
+    const missing = front.deliverables.filter((d) => !order.includes(d.id));
+    return [...known, ...missing];
+  }
+
+  function handleRowDragStart(frontId: string, id: string) {
+    return (e: React.DragEvent) => {
+      dragDeliverableRef.current = { frontId, id };
+      e.dataTransfer.effectAllowed = "move";
+    };
+  }
+
+  function handleRowDragOver(e: React.DragEvent) {
+    if (dragDeliverableRef.current) e.preventDefault();
+  }
+
+  function handleRowDrop(front: FrontView, targetId: string) {
+    return (e: React.DragEvent) => {
+      const drag = dragDeliverableRef.current;
+      dragDeliverableRef.current = null;
+      if (!drag || drag.frontId !== front.id || drag.id === targetId) return;
+      e.preventDefault();
+      const current = orderedDeliverables(front).map((d) => d.id);
+      const fromIdx = current.indexOf(drag.id);
+      const toIdx = current.indexOf(targetId);
+      if (fromIdx === -1 || toIdx === -1) return;
+      const next = [...current];
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, drag.id);
+      setOrderOverrides((prev) => ({ ...prev, [front.id]: next }));
+      setReorderedFronts((prev) => ({ ...prev, [front.id]: true }));
+    };
+  }
 
   const allDates = fronts
     .flatMap((f) => f.deliverables)
@@ -280,7 +323,10 @@ export function GanttChart({
     }));
   }
 
-  const pendingCount = Object.keys(pendingDateFields).length + Object.keys(pendingApprovalFields).length;
+  const pendingCount =
+    Object.keys(pendingDateFields).length +
+    Object.keys(pendingApprovalFields).length +
+    Object.keys(reorderedFronts).length;
 
   useEffect(() => {
     if (pendingCount === 0) return;
@@ -308,11 +354,18 @@ export function GanttChart({
           if (fields === "both" || fields === "end") payload.approvalEndOverride = ov.end.toISOString();
           return updateDeliverableApprovalWindowAction(projectId, id, payload);
         }),
+        ...Object.keys(reorderedFronts).map((frontId) => {
+          const order = orderOverrides[frontId];
+          if (!order) return Promise.resolve();
+          return reorderDeliverablesAction(projectId, frontId, order);
+        }),
       ]);
       setOverrides({});
       setApprovalOverrides({});
       setPendingDateFields({});
       setPendingApprovalFields({});
+      setOrderOverrides({});
+      setReorderedFronts({});
     });
   }
 
@@ -321,6 +374,8 @@ export function GanttChart({
     setApprovalOverrides({});
     setPendingDateFields({});
     setPendingApprovalFields({});
+    setOrderOverrides({});
+    setReorderedFronts({});
   }
 
   function addRow(frontId: string, formData: FormData) {
@@ -490,16 +545,35 @@ export function GanttChart({
                     Adicionar linha em {front.name}
                   </button>
                 ))}
-              {front.deliverables.map((d) => {
+              {orderedDeliverables(front).map((d) => {
                 const ov = overrides[d.id];
                 const ganttStart = ov?.start ?? d.ganttStart;
                 const ganttEnd = ov?.end ?? d.ganttEnd;
                 return (
                   <div key={d.id}>
-                    <div className="flex border-b border-neutral-100">
-                      <div style={{ width: LABEL_COL_WIDTH }} className="shrink-0 px-4 py-2">
-                        <p className="text-sm font-medium text-neutral-800">{d.name}</p>
-                        {d.ruleLabel && <p className="text-[11px] text-neutral-400">{d.ruleLabel}</p>}
+                    <div
+                      className="flex border-b border-neutral-100"
+                      onDragOver={handleRowDragOver}
+                      onDrop={handleRowDrop(front, d.id)}
+                    >
+                      <div
+                        style={{ width: LABEL_COL_WIDTH }}
+                        className="flex shrink-0 items-start gap-1.5 px-4 py-2"
+                      >
+                        {canEdit && (
+                          <span
+                            draggable
+                            onDragStart={handleRowDragStart(front.id, d.id)}
+                            className="mt-0.5 cursor-grab select-none leading-none text-neutral-300 hover:text-neutral-500"
+                            title="Arrastar para reordenar"
+                          >
+                            ⠿
+                          </span>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-neutral-800">{d.name}</p>
+                          {d.ruleLabel && <p className="text-[11px] text-neutral-400">{d.ruleLabel}</p>}
+                        </div>
                       </div>
                       <DeliverableBar
                         kind={d.kind}

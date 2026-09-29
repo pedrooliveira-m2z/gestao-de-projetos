@@ -152,6 +152,22 @@ export async function deleteDeliverableAction(projectId: string, deliverableId: 
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function reorderDeliverablesAction(
+  projectId: string,
+  frontId: string,
+  orderedDeliverableIds: string[]
+) {
+  await assertInternal();
+  await prisma.$transaction(
+    orderedDeliverableIds.map((id, order) =>
+      prisma.deliverable.updateMany({ where: { id, frontId }, data: { order } })
+    )
+  );
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function updateDeliverableDatesAction(
   projectId: string,
   deliverableId: string,
