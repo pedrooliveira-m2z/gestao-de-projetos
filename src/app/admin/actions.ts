@@ -181,6 +181,40 @@ export async function updateDeliverableRuleLabelAction(
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function addDeliverableMarkAction(projectId: string, deliverableId: string, date: string) {
+  await assertInternal();
+  const start = new Date(date);
+  const end = new Date(date);
+  end.setUTCDate(end.getUTCDate() + 1);
+  await prisma.deliverableMark.create({ data: { deliverableId, startDate: start, endDate: end } });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
+export async function updateDeliverableMarkDatesAction(
+  projectId: string,
+  markId: string,
+  data: { startDate?: string; endDate?: string }
+) {
+  await assertInternal();
+  const updateData: { startDate?: Date; endDate?: Date } = {};
+  if (data.startDate) updateData.startDate = new Date(data.startDate);
+  if (data.endDate) updateData.endDate = new Date(data.endDate);
+  await prisma.deliverableMark.update({ where: { id: markId }, data: updateData });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
+export async function deleteDeliverableMarkAction(projectId: string, markId: string) {
+  await assertInternal();
+  await prisma.deliverableMark.delete({ where: { id: markId } });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function reorderDeliverablesAction(
   projectId: string,
   frontId: string,

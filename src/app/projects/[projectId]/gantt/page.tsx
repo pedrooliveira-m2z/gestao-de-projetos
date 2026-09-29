@@ -21,7 +21,7 @@ export default async function ProjectGanttPage({
     <div className="min-h-screen">
       <TopNav />
       <div className="bg-[#0b0e14] px-6 py-6 text-white">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1800px]">
           <p className="text-xs font-semibold tracking-[0.15em] text-neutral-400 uppercase">
             Gantt atualizado
           </p>
@@ -34,7 +34,7 @@ export default async function ProjectGanttPage({
         </div>
       </div>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-[1800px] px-6 py-8">
         <ProjectTabs projectId={view.id} active="gantt" />
         <div className="mt-6">
           <GanttChart

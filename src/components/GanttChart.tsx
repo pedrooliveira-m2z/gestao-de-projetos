@@ -11,6 +11,9 @@ import {
   updateDeliverableNameAction,
   updateDeliverableRuleLabelAction,
   deleteDeliverableAction,
+  addDeliverableMarkAction,
+  updateDeliverableMarkDatesAction,
+  deleteDeliverableMarkAction,
 } from "@/app/admin/actions";
 
 const LABEL_COL_WIDTH = 260;
@@ -56,33 +59,34 @@ interface DragState {
   lastEnd: number;
 }
 
-/** A single BAR or MILESTONE mark, draggable (move/resize) when `canEdit` is true. */
-function DeliverableBar({
-  kind,
-  start,
-  end,
-  rangeStart,
-  rangeEnd,
-  colorHex,
-  canEdit,
-  titleText,
-  variant = "solid",
-  onPreview,
-  onCommit,
-}: {
+interface TrackItem {
+  key: string;
   kind: "BAR" | "MILESTONE";
   start: Date | null;
   end: Date | null;
-  rangeStart: Date;
-  rangeEnd: Date;
   colorHex: string;
-  canEdit: boolean;
   titleText: string;
   variant?: "solid" | "approval";
   onPreview: (start: Date, end: Date) => void;
   onCommit: (start: Date, end: Date, fields: DragFields) => void;
+  onDelete?: () => void;
+}
+
+/** A single BAR or MILESTONE mark inside a shared track, draggable (move/resize) when `canEdit` is true. */
+function BarItem({
+  trackRef,
+  rangeStart,
+  rangeEnd,
+  canEdit,
+  item,
+}: {
+  trackRef: React.RefObject<HTMLDivElement | null>;
+  rangeStart: Date;
+  rangeEnd: Date;
+  canEdit: boolean;
+  item: TrackItem;
 }) {
-  const trackRef = useRef<HTMLDivElement>(null);
+  const { kind, start, end, colorHex, titleText, variant = "solid", onPreview, onCommit, onDelete } = item;
   const dragRef = useRef<DragState | null>(null);
   const totalMs = rangeEnd.getTime() - rangeStart.getTime();
 
@@ -144,6 +148,15 @@ function DeliverableBar({
     onPointerUp: handleUp,
     onPointerCancel: handleUp,
   };
+  // Prevent a click/double-click on an existing bar from also being read by the
+  // track as "empty space clicked" (which would create a new mark underneath it).
+  const stopClick = (e: React.MouseEvent) => e.stopPropagation();
+  const handleDoubleClick = onDelete
+    ? (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDelete();
+      }
+    : undefined;
 
   const barStyleExtra: React.CSSProperties =
     variant === "approval"
@@ -159,56 +172,104 @@ function DeliverableBar({
       ? "absolute top-1/2 h-3 -translate-y-1/2 rounded-sm border border-dashed border-neutral-500"
       : "absolute top-1/2 h-4 -translate-y-1/2 rounded-sm";
 
+  return kind === "MILESTONE" && end ? (
+    <div
+      className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rotate-45"
+      style={{
+        left: `${pct(end, rangeStart, rangeEnd)}%`,
+        backgroundColor: colorHex,
+        cursor: canEdit ? "grab" : undefined,
+        touchAction: "none",
+      }}
+      onPointerDown={beginDrag("move")}
+      onClick={stopClick}
+      onDoubleClick={handleDoubleClick}
+      {...dragEvents}
+      title={titleText}
+    />
+  ) : (
+    start &&
+    end && (
+      <div
+        className={barClassName}
+        style={{
+          left: `${pct(start, rangeStart, rangeEnd)}%`,
+          width: `${Math.max(0.6, pct(end, rangeStart, rangeEnd) - pct(start, rangeStart, rangeEnd))}%`,
+          cursor: canEdit ? "grab" : undefined,
+          touchAction: "none",
+          ...barStyleExtra,
+        }}
+        onPointerDown={beginDrag("move")}
+        onClick={stopClick}
+        onDoubleClick={handleDoubleClick}
+        {...dragEvents}
+        title={titleText}
+      >
+        {canEdit && (
+          <>
+            <div
+              className="absolute -left-1 top-0 h-full w-2.5 cursor-ew-resize"
+              style={{ touchAction: "none" }}
+              onPointerDown={beginDrag("resize-start")}
+              onClick={stopClick}
+              {...dragEvents}
+            />
+            <div
+              className="absolute -right-1 top-0 h-full w-2.5 cursor-ew-resize"
+              style={{ touchAction: "none" }}
+              onPointerDown={beginDrag("resize-end")}
+              onClick={stopClick}
+              {...dragEvents}
+            />
+          </>
+        )}
+      </div>
+    )
+  );
+}
+
+/** The timeline area for one row: a shared track that can host several draggable items
+ * (a deliverable's own bar plus any extra marks), and optionally create a new mark
+ * when an empty day cell is clicked. */
+function GanttTrack({
+  rangeStart,
+  rangeEnd,
+  canEdit,
+  variant = "solid",
+  onEmptyClick,
+  items,
+}: {
+  rangeStart: Date;
+  rangeEnd: Date;
+  canEdit: boolean;
+  variant?: "solid" | "approval";
+  onEmptyClick?: (date: Date) => void;
+  items: TrackItem[];
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  function handleTrackClick(e: React.MouseEvent) {
+    if (!onEmptyClick || !canEdit || !trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const clickPct = (e.clientX - rect.left) / rect.width;
+    const dateMs = rangeStart.getTime() + clickPct * (rangeEnd.getTime() - rangeStart.getTime());
+    const snapped = Math.round(dateMs / DAY_MS) * DAY_MS;
+    onEmptyClick(new Date(snapped));
+  }
+
   return (
-    <div ref={trackRef} className={`relative flex-1 ${variant === "approval" ? "py-1.5" : "py-2"}`}>
-      {kind === "MILESTONE" && end ? (
-        <div
-          className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rotate-45"
-          style={{
-            left: `${pct(end, rangeStart, rangeEnd)}%`,
-            backgroundColor: colorHex,
-            cursor: canEdit ? "grab" : undefined,
-            touchAction: "none",
-          }}
-          onPointerDown={beginDrag("move")}
-          {...dragEvents}
-          title={titleText}
-        />
-      ) : (
-        start &&
-        end && (
-          <div
-            className={barClassName}
-            style={{
-              left: `${pct(start, rangeStart, rangeEnd)}%`,
-              width: `${Math.max(0.6, pct(end, rangeStart, rangeEnd) - pct(start, rangeStart, rangeEnd))}%`,
-              cursor: canEdit ? "grab" : undefined,
-              touchAction: "none",
-              ...barStyleExtra,
-            }}
-            onPointerDown={beginDrag("move")}
-            {...dragEvents}
-            title={titleText}
-          >
-            {canEdit && (
-              <>
-                <div
-                  className="absolute -left-1 top-0 h-full w-2.5 cursor-ew-resize"
-                  style={{ touchAction: "none" }}
-                  onPointerDown={beginDrag("resize-start")}
-                  {...dragEvents}
-                />
-                <div
-                  className="absolute -right-1 top-0 h-full w-2.5 cursor-ew-resize"
-                  style={{ touchAction: "none" }}
-                  onPointerDown={beginDrag("resize-end")}
-                  {...dragEvents}
-                />
-              </>
-            )}
-          </div>
-        )
-      )}
+    <div
+      ref={trackRef}
+      className={`relative flex-1 ${variant === "approval" ? "py-1.5" : "py-2"} ${
+        onEmptyClick && canEdit ? "cursor-cell" : ""
+      }`}
+      onClick={handleTrackClick}
+      title={onEmptyClick && canEdit ? "Clique num dia vazio para criar uma nova barra" : undefined}
+    >
+      {items.map((item) => (
+        <BarItem key={item.key} trackRef={trackRef} rangeStart={rangeStart} rangeEnd={rangeEnd} canEdit={canEdit} item={item} />
+      ))}
     </div>
   );
 }
@@ -238,6 +299,9 @@ export function GanttChart({
   const dragDeliverableRef = useRef<{ frontId: string; id: string } | null>(null);
   const [pendingNames, setPendingNames] = useState<Record<string, string>>({});
   const [pendingRuleLabels, setPendingRuleLabels] = useState<Record<string, string>>({});
+  const [markOverrides, setMarkOverrides] = useState<Record<string, { start: Date; end: Date }>>({});
+  const [pendingMarkFields, setPendingMarkFields] = useState<Record<string, DragFields>>({});
+  const [, startAddingMark] = useTransition();
 
   function stageName(id: string, name: string) {
     setPendingNames((prev) => ({ ...prev, [id]: name }));
@@ -250,6 +314,26 @@ export function GanttChart({
   async function removeDeliverable(id: string, name: string) {
     if (!window.confirm(`Remover a entrega "${name}"? Essa ação não pode ser desfeita.`)) return;
     await deleteDeliverableAction(projectId, id);
+  }
+
+  function previewMark(markId: string, start: Date, end: Date) {
+    setMarkOverrides((prev) => ({ ...prev, [markId]: { start, end } }));
+  }
+
+  function stageMark(markId: string, start: Date, end: Date, fields: DragFields) {
+    setMarkOverrides((prev) => ({ ...prev, [markId]: { start, end } }));
+    setPendingMarkFields((prev) => ({ ...prev, [markId]: mergeFields(prev[markId], fields) }));
+  }
+
+  function addMark(deliverableId: string, date: Date) {
+    startAddingMark(async () => {
+      await addDeliverableMarkAction(projectId, deliverableId, date.toISOString());
+    });
+  }
+
+  async function removeMark(markId: string) {
+    if (!window.confirm("Remover esta barra? Essa ação não pode ser desfeita.")) return;
+    await deleteDeliverableMarkAction(projectId, markId);
   }
 
   function orderedDeliverables(front: FrontView): DeliverableView[] {
@@ -293,7 +377,13 @@ export function GanttChart({
 
   const allDates = fronts
     .flatMap((f) => f.deliverables)
-    .flatMap((d) => [d.ganttStart, d.approvalWindowStart, d.approvalWindowEnd, d.ganttEnd])
+    .flatMap((d) => [
+      d.ganttStart,
+      d.approvalWindowStart,
+      d.approvalWindowEnd,
+      d.ganttEnd,
+      ...d.marks.flatMap((m) => [m.start, m.end]),
+    ])
     .filter((d): d is Date => !!d);
   allDates.push(cutoffDate);
 
@@ -344,7 +434,8 @@ export function GanttChart({
     Object.keys(pendingApprovalFields).length +
     Object.keys(reorderedFronts).length +
     dirtyNameIds.length +
-    dirtyRuleLabelIds.length;
+    dirtyRuleLabelIds.length +
+    Object.keys(pendingMarkFields).length;
 
   useEffect(() => {
     if (pendingCount === 0) return;
@@ -381,6 +472,14 @@ export function GanttChart({
         ...dirtyRuleLabelIds.map((id) =>
           updateDeliverableRuleLabelAction(projectId, id, pendingRuleLabels[id])
         ),
+        ...Object.entries(pendingMarkFields).map(([id, fields]) => {
+          const ov = markOverrides[id];
+          if (!ov) return Promise.resolve();
+          const payload: { startDate?: string; endDate?: string } = {};
+          if (fields === "both" || fields === "start") payload.startDate = ov.start.toISOString();
+          if (fields === "both" || fields === "end") payload.endDate = ov.end.toISOString();
+          return updateDeliverableMarkDatesAction(projectId, id, payload);
+        }),
       ]);
       setOverrides({});
       setApprovalOverrides({});
@@ -390,6 +489,8 @@ export function GanttChart({
       setReorderedFronts({});
       setPendingNames({});
       setPendingRuleLabels({});
+      setMarkOverrides({});
+      setPendingMarkFields({});
     });
   }
 
@@ -402,6 +503,8 @@ export function GanttChart({
     setReorderedFronts({});
     setPendingNames({});
     setPendingRuleLabels({});
+    setMarkOverrides({});
+    setPendingMarkFields({});
   }
 
   function addRow(frontId: string, formData: FormData) {
@@ -634,23 +737,44 @@ export function GanttChart({
                           </button>
                         )}
                       </div>
-                      <DeliverableBar
-                        kind={d.kind}
-                        start={ganttStart}
-                        end={ganttEnd}
+                      <GanttTrack
                         rangeStart={rangeStart}
                         rangeEnd={rangeEnd}
-                        colorHex={d.colorHex}
                         canEdit={canEdit}
-                        titleText={
-                          d.kind === "MILESTONE" && ganttEnd
-                            ? formatShortDate(ganttEnd)
-                            : ganttStart && ganttEnd
-                              ? `${formatShortDate(ganttStart)} - ${formatShortDate(ganttEnd)}`
-                              : ""
-                        }
-                        onPreview={(s, e) => previewDates(d.id, s, e)}
-                        onCommit={(s, e, fields) => stageDates(d.id, s, e, fields)}
+                        onEmptyClick={(date) => addMark(d.id, date)}
+                        items={[
+                          {
+                            key: d.id,
+                            kind: d.kind,
+                            start: ganttStart,
+                            end: ganttEnd,
+                            colorHex: d.colorHex,
+                            titleText:
+                              d.kind === "MILESTONE" && ganttEnd
+                                ? formatShortDate(ganttEnd)
+                                : ganttStart && ganttEnd
+                                  ? `${formatShortDate(ganttStart)} - ${formatShortDate(ganttEnd)}`
+                                  : "",
+                            onPreview: (s, e) => previewDates(d.id, s, e),
+                            onCommit: (s, e, fields) => stageDates(d.id, s, e, fields),
+                          },
+                          ...d.marks.map((m) => {
+                            const mov = markOverrides[m.id];
+                            const start = mov?.start ?? m.start;
+                            const end = mov?.end ?? m.end;
+                            return {
+                              key: m.id,
+                              kind: "BAR" as const,
+                              start,
+                              end,
+                              colorHex: m.colorHex,
+                              titleText: `${formatShortDate(start)} - ${formatShortDate(end)} (clique duplo para remover)`,
+                              onPreview: (s: Date, e: Date) => previewMark(m.id, s, e),
+                              onCommit: (s: Date, e: Date, fields: DragFields) => stageMark(m.id, s, e, fields),
+                              onDelete: () => removeMark(m.id),
+                            };
+                          }),
+                        ]}
                       />
                     </div>
                     {d.hasApprovalWindow &&
@@ -667,18 +791,24 @@ export function GanttChart({
                             >
                               <p className="text-[11px] text-neutral-500">↳ Aprovação do cliente</p>
                             </div>
-                            <DeliverableBar
-                              kind="BAR"
-                              start={approvalStart}
-                              end={approvalEnd}
+                            <GanttTrack
                               rangeStart={rangeStart}
                               rangeEnd={rangeEnd}
-                              colorHex={d.approvalColorHex}
                               canEdit={canEdit}
                               variant="approval"
-                              titleText={`Aprovação: ${formatShortDate(approvalStart)} - ${formatShortDate(approvalEnd)}`}
-                              onPreview={(s, e) => previewApproval(d.id, s, e)}
-                              onCommit={(s, e, fields) => stageApproval(d.id, s, e, fields)}
+                              items={[
+                                {
+                                  key: `${d.id}-approval`,
+                                  kind: "BAR",
+                                  start: approvalStart,
+                                  end: approvalEnd,
+                                  colorHex: d.approvalColorHex,
+                                  variant: "approval",
+                                  titleText: `Aprovação: ${formatShortDate(approvalStart)} - ${formatShortDate(approvalEnd)}`,
+                                  onPreview: (s, e) => previewApproval(d.id, s, e),
+                                  onCommit: (s, e, fields) => stageApproval(d.id, s, e, fields),
+                                },
+                              ]}
                             />
                           </div>
                         );

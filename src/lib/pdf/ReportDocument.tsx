@@ -226,7 +226,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function ganttRange(fronts: FrontView[], cutoffDate: Date) {
   const dates = fronts
     .flatMap((f) => f.deliverables)
-    .flatMap((d) => [d.ganttStart, d.approvalWindowStart, d.approvalWindowEnd, d.ganttEnd])
+    .flatMap((d) => [
+      d.ganttStart,
+      d.approvalWindowStart,
+      d.approvalWindowEnd,
+      d.ganttEnd,
+      ...d.marks.flatMap((m) => [m.start, m.end]),
+    ])
     .filter((d): d is Date => !!d);
   dates.push(cutoffDate);
   const start = new Date(Math.min(...dates.map((d) => d.getTime())) - 3 * DAY_MS);
@@ -390,6 +396,17 @@ function GanttPage({ view }: { view: ProjectView }) {
                     />
                   )
                 )}
+                {d.marks.map((m) => (
+                  <Rect
+                    key={m.id}
+                    x={labelWidth + x(m.start)}
+                    y={barY}
+                    width={Math.max(2, x(m.end) - x(m.start))}
+                    height={7}
+                    rx={1.5}
+                    fill={m.colorHex}
+                  />
+                ))}
               </React.Fragment>
             );
           })}

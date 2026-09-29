@@ -27,6 +27,14 @@ export interface DeliverableView {
   approvalColorHex: string;
   isEstimated: boolean;
   clickupUrl: string | null;
+  marks: DeliverableMarkView[];
+}
+
+export interface DeliverableMarkView {
+  id: string;
+  start: Date;
+  end: Date;
+  colorHex: string;
 }
 
 export interface FrontView {
@@ -54,7 +62,12 @@ export async function loadProjectView(projectId: string): Promise<ProjectView | 
       client: true,
       fronts: {
         orderBy: { order: "asc" },
-        include: { deliverables: { orderBy: { order: "asc" } } },
+        include: {
+          deliverables: {
+            orderBy: { order: "asc" },
+            include: { marks: { orderBy: { startDate: "asc" } } },
+          },
+        },
       },
     },
   });
@@ -113,6 +126,12 @@ export async function loadProjectView(projectId: string): Promise<ProjectView | 
         approvalColorHex: d.approvalColorHex ?? "#9ca3af",
         isEstimated: timeline.isEstimatedDate,
         clickupUrl: rawTask?.url ?? null,
+        marks: d.marks.map((m) => ({
+          id: m.id,
+          start: m.startDate,
+          end: m.endDate,
+          colorHex: m.colorHex ?? d.colorHexOverride ?? front.colorHex,
+        })),
       };
     }),
   }));
