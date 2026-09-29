@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { FrontView, DeliverableView } from "@/lib/project-data";
 import { formatShortDate } from "@/lib/format";
 import { updateDeliverableDatesAction, updateDeliverableApprovalWindowAction } from "@/app/admin/actions";
@@ -40,6 +40,12 @@ function timelineLeft(pctValue: number): string {
 }
 
 type DragFields = "both" | "start" | "end";
+
+/** Accumulates which edges were touched across multiple drags before a single save. */
+function mergeFields(prev: DragFields | undefined, next: DragFields): DragFields {
+  if (!prev || prev === next) return next;
+  return "both";
+}
 type DragMode = "move" | "resize-start" | "resize-end";
 
 interface DragState {
@@ -223,7 +229,9 @@ export function GanttChart({
   const [approvalOverrides, setApprovalOverrides] = useState<Record<string, { start: Date; end: Date }>>(
     {}
   );
-  const [, startSaving] = useTransition();
+  const [pendingDateFields, setPendingDateFields] = useState<Record<string, DragFields>>({});
+  const [pendingApprovalFields, setPendingApprovalFields] = useState<Record<string, DragFields>>({});
+  const [isSaving, startSaving] = useTransition();
 
   const allDates = fronts
     .flatMap((f) => f.deliverables)
@@ -248,44 +256,97 @@ export function GanttChart({
     setOverrides((prev) => ({ ...prev, [deliverableId]: { start, end } }));
   }
 
-  function commitDates(deliverableId: string, start: Date, end: Date, fields: DragFields) {
-    const payload: { startDateOverride?: string | null; endDateOverride?: string | null } = {};
-    if (fields === "both" || fields === "start") payload.startDateOverride = start.toISOString();
-    if (fields === "both" || fields === "end") payload.endDateOverride = end.toISOString();
-    startSaving(async () => {
-      await updateDeliverableDatesAction(projectId, deliverableId, payload);
-      setOverrides((prev) => {
-        const next = { ...prev };
-        delete next[deliverableId];
-        return next;
-      });
-    });
+  // Dragging only stages the change locally; nothing is saved until "Salvar alterações".
+  function stageDates(deliverableId: string, start: Date, end: Date, fields: DragFields) {
+    setOverrides((prev) => ({ ...prev, [deliverableId]: { start, end } }));
+    setPendingDateFields((prev) => ({ ...prev, [deliverableId]: mergeFields(prev[deliverableId], fields) }));
   }
 
   function previewApproval(deliverableId: string, start: Date, end: Date) {
     setApprovalOverrides((prev) => ({ ...prev, [deliverableId]: { start, end } }));
   }
 
-  function commitApproval(deliverableId: string, start: Date, end: Date, fields: DragFields) {
-    const payload: { approvalStartOverride?: string | null; approvalEndOverride?: string | null } = {};
-    if (fields === "both" || fields === "start") payload.approvalStartOverride = start.toISOString();
-    if (fields === "both" || fields === "end") payload.approvalEndOverride = end.toISOString();
+  function stageApproval(deliverableId: string, start: Date, end: Date, fields: DragFields) {
+    setApprovalOverrides((prev) => ({ ...prev, [deliverableId]: { start, end } }));
+    setPendingApprovalFields((prev) => ({
+      ...prev,
+      [deliverableId]: mergeFields(prev[deliverableId], fields),
+    }));
+  }
+
+  const pendingCount = Object.keys(pendingDateFields).length + Object.keys(pendingApprovalFields).length;
+
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [pendingCount]);
+
+  function saveAll() {
     startSaving(async () => {
-      await updateDeliverableApprovalWindowAction(projectId, deliverableId, payload);
-      setApprovalOverrides((prev) => {
-        const next = { ...prev };
-        delete next[deliverableId];
-        return next;
-      });
+      await Promise.all([
+        ...Object.entries(pendingDateFields).map(([id, fields]) => {
+          const ov = overrides[id];
+          if (!ov) return Promise.resolve();
+          const payload: { startDateOverride?: string | null; endDateOverride?: string | null } = {};
+          if (fields === "both" || fields === "start") payload.startDateOverride = ov.start.toISOString();
+          if (fields === "both" || fields === "end") payload.endDateOverride = ov.end.toISOString();
+          return updateDeliverableDatesAction(projectId, id, payload);
+        }),
+        ...Object.entries(pendingApprovalFields).map(([id, fields]) => {
+          const ov = approvalOverrides[id];
+          if (!ov) return Promise.resolve();
+          const payload: { approvalStartOverride?: string | null; approvalEndOverride?: string | null } = {};
+          if (fields === "both" || fields === "start") payload.approvalStartOverride = ov.start.toISOString();
+          if (fields === "both" || fields === "end") payload.approvalEndOverride = ov.end.toISOString();
+          return updateDeliverableApprovalWindowAction(projectId, id, payload);
+        }),
+      ]);
+      setOverrides({});
+      setApprovalOverrides({});
+      setPendingDateFields({});
+      setPendingApprovalFields({});
     });
+  }
+
+  function discardAll() {
+    setOverrides({});
+    setApprovalOverrides({});
+    setPendingDateFields({});
+    setPendingApprovalFields({});
   }
 
   return (
     <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
       {canEdit && (
-        <p className="border-b border-neutral-100 bg-neutral-50 px-4 py-1.5 text-[11px] text-neutral-500">
-          Arraste as barras para mover, ou as bordas para redimensionar.
-        </p>
+        <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-1.5 text-[11px] text-neutral-500">
+          <span>Arraste as barras para mover, ou as bordas para redimensionar.</span>
+          {pendingCount > 0 && (
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-amber-700">
+                {pendingCount} alteraç{pendingCount > 1 ? "ões" : "ão"} pendente
+                {pendingCount > 1 ? "s" : ""}
+              </span>
+              <button
+                type="button"
+                onClick={discardAll}
+                disabled={isSaving}
+                className="rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-neutral-600 hover:border-neutral-500 disabled:opacity-60"
+              >
+                Descartar
+              </button>
+              <button
+                type="button"
+                onClick={saveAll}
+                disabled={isSaving}
+                className="rounded-md bg-neutral-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-black disabled:opacity-60"
+              >
+                {isSaving ? "Salvando..." : "Salvar alterações"}
+              </button>
+            </span>
+          )}
+        </div>
       )}
       <div style={{ minWidth: LABEL_COL_WIDTH + ticks.length * 90 }}>
         {/* Timeline header */}
@@ -381,7 +442,7 @@ export function GanttChart({
                               : ""
                         }
                         onPreview={(s, e) => previewDates(d.id, s, e)}
-                        onCommit={(s, e, fields) => commitDates(d.id, s, e, fields)}
+                        onCommit={(s, e, fields) => stageDates(d.id, s, e, fields)}
                       />
                     </div>
                     {d.hasApprovalWindow &&
@@ -409,7 +470,7 @@ export function GanttChart({
                               variant="approval"
                               titleText={`Aprovação: ${formatShortDate(approvalStart)} - ${formatShortDate(approvalEnd)}`}
                               onPreview={(s, e) => previewApproval(d.id, s, e)}
-                              onCommit={(s, e, fields) => commitApproval(d.id, s, e, fields)}
+                              onCommit={(s, e, fields) => stageApproval(d.id, s, e, fields)}
                             />
                           </div>
                         );
