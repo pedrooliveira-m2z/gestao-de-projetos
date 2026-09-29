@@ -13,22 +13,13 @@ import {
 } from "@/app/admin/actions";
 
 const LABEL_COL_WIDTH = 260;
+const DAY_COL_WIDTH = 42;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function pct(date: Date, start: Date, end: Date): number {
   const total = end.getTime() - start.getTime();
   if (total <= 0) return 0;
   return Math.min(100, Math.max(0, ((date.getTime() - start.getTime()) / total) * 100));
-}
-
-function weeklyTicks(start: Date, end: Date): Date[] {
-  const ticks: Date[] = [];
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    ticks.push(new Date(cursor));
-    cursor.setUTCDate(cursor.getUTCDate() + 7);
-  }
-  return ticks;
 }
 
 function enumerateDays(start: Date, end: Date): Date[] {
@@ -309,7 +300,6 @@ export function GanttChart({
   const rangeEnd = new Date(Math.max(...allDates.map((d) => d.getTime())));
   rangeEnd.setUTCDate(rangeEnd.getUTCDate() + 3);
 
-  const ticks = weeklyTicks(rangeStart, rangeEnd);
   const days = enumerateDays(rangeStart, rangeEnd);
   const todayPct = pct(cutoffDate, rangeStart, rangeEnd);
 
@@ -436,7 +426,7 @@ export function GanttChart({
           )}
         </div>
       )}
-      <div style={{ minWidth: LABEL_COL_WIDTH + ticks.length * 90 }}>
+      <div style={{ minWidth: LABEL_COL_WIDTH + days.length * DAY_COL_WIDTH }}>
         {/* Timeline header */}
         <div className="relative flex border-b border-neutral-200 bg-[#0b0e14] text-white">
           <div style={{ width: LABEL_COL_WIDTH }} className="shrink-0 px-4 py-2 text-xs font-semibold uppercase">
@@ -444,14 +434,19 @@ export function GanttChart({
           </div>
           <div className="relative flex-1">
             <div className="flex h-full">
-              {ticks.map((tick, i) => (
-                <div
-                  key={i}
-                  className="flex-1 border-l border-white/10 px-1.5 py-2 text-[11px] text-neutral-300"
-                >
-                  {formatShortDate(tick)}
-                </div>
-              ))}
+              {days.map((day, i) => {
+                const isWeekend = day.getUTCDay() === 0 || day.getUTCDay() === 6;
+                return (
+                  <div
+                    key={i}
+                    className={`flex-1 border-l border-white/10 px-1 py-2 text-center text-[11px] whitespace-nowrap ${
+                      isWeekend ? "text-neutral-500" : "text-neutral-300"
+                    }`}
+                  >
+                    {formatShortDate(day)}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
