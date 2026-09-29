@@ -16,6 +16,7 @@ import {
   deleteFrontAction,
   updateCutoffAction,
   updateDeliverableColorAction,
+  updateDeliverableApprovalColorAction,
 } from "../../actions";
 
 export default async function AdminProjectPage({
@@ -105,6 +106,11 @@ export default async function AdminProjectPage({
                   {front.deliverables.map((d) => {
                     const deleteDeliverable = deleteDeliverableAction.bind(null, project.id, d.id);
                     const updateColor = updateDeliverableColorAction.bind(null, project.id, d.id);
+                    const updateApprovalColor = updateDeliverableApprovalColorAction.bind(
+                      null,
+                      project.id,
+                      d.id
+                    );
                     return (
                       <div key={d.id} className="flex items-center justify-between px-4 py-2 text-sm">
                         <div>
@@ -143,6 +149,23 @@ export default async function AdminProjectPage({
                                 className="text-[11px] text-neutral-400 underline hover:text-neutral-700"
                               >
                                 usar cor da frente
+                              </button>
+                            </form>
+                          )}
+                          {d.hasApprovalWindow && (
+                            <form action={updateApprovalColor} className="flex items-center gap-1">
+                              <input
+                                type="color"
+                                name="approvalColorHex"
+                                defaultValue={d.approvalColorHex ?? "#9ca3af"}
+                                title="Cor da janela de aprovação"
+                                className="h-6 w-7 cursor-pointer rounded border border-neutral-300"
+                              />
+                              <button
+                                type="submit"
+                                className="text-[11px] text-neutral-500 hover:text-neutral-800"
+                              >
+                                cor da aprovação
                               </button>
                             </form>
                           )}

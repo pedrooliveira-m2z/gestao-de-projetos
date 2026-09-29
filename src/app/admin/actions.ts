@@ -167,6 +167,43 @@ export async function updateDeliverableDatesAction(
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function updateDeliverableApprovalWindowAction(
+  projectId: string,
+  deliverableId: string,
+  data: { approvalStartOverride?: string | null; approvalEndOverride?: string | null }
+) {
+  await assertInternal();
+  const updateData: { approvalStartOverride?: Date | null; approvalEndOverride?: Date | null } = {};
+  if ("approvalStartOverride" in data) {
+    updateData.approvalStartOverride = data.approvalStartOverride
+      ? new Date(data.approvalStartOverride)
+      : null;
+  }
+  if ("approvalEndOverride" in data) {
+    updateData.approvalEndOverride = data.approvalEndOverride ? new Date(data.approvalEndOverride) : null;
+  }
+  await prisma.deliverable.update({ where: { id: deliverableId }, data: updateData });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
+export async function updateDeliverableApprovalColorAction(
+  projectId: string,
+  deliverableId: string,
+  formData: FormData
+) {
+  await assertInternal();
+  const approvalColorHex = String(formData.get("approvalColorHex") ?? "").trim();
+  await prisma.deliverable.update({
+    where: { id: deliverableId },
+    data: { approvalColorHex: approvalColorHex || null },
+  });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function updateDeliverableColorAction(
   projectId: string,
   deliverableId: string,

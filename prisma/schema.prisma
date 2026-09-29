@@ -104,6 +104,9 @@ model Deliverable {
   manualStatusLabel String?
   hasApprovalWindow Boolean         @default(false)
   approvalDays      Int             @default(5)
+  approvalStartOverride DateTime?
+  approvalEndOverride   DateTime?
+  approvalColorHex  String?
   order             Int             @default(0)
   colorHexOverride  String?
   createdAt         DateTime        @default(now())

@@ -31,6 +31,7 @@ export interface DeliverableTimeline {
   ganttStart: Date | null;
   ganttEnd: Date | null;
   approvalWindowStart: Date | null;
+  approvalWindowEnd: Date | null;
   status: DeliverableStatus;
   statusLabel: string;
   isEstimatedDate: boolean;
@@ -79,6 +80,8 @@ export function computeDeliverableTimeline(
     | "endDateOverride"
     | "hasApprovalWindow"
     | "approvalDays"
+    | "approvalStartOverride"
+    | "approvalEndOverride"
     | "manualStatusLabel"
   >,
   projectTriggers: ProjectTriggers,
@@ -104,10 +107,13 @@ export function computeDeliverableTimeline(
   const ganttStart = deliverable.startDateOverride ?? triggerDate ?? null;
   const ganttEnd = deadline ?? (clickup?.dueDate ?? null) ?? ganttStart;
 
-  const approvalWindowStart =
-    deliverable.hasApprovalWindow && ganttEnd
-      ? addBusinessDays(ganttEnd, -deliverable.approvalDays)
-      : null;
+  const approvalWindowStart = deliverable.hasApprovalWindow
+    ? (deliverable.approvalStartOverride ??
+      (ganttEnd ? addBusinessDays(ganttEnd, -deliverable.approvalDays) : null))
+    : null;
+  const approvalWindowEnd = deliverable.hasApprovalWindow
+    ? (deliverable.approvalEndOverride ?? ganttEnd)
+    : null;
 
   const doneStatuses = clickup?.doneStatuses ?? ["concluído", "concluido", "done", "closed"];
   // Sem tarefa do ClickUp vinculada, o único sinal de conclusão disponível é a situação manual
@@ -143,6 +149,7 @@ export function computeDeliverableTimeline(
     ganttStart,
     ganttEnd,
     approvalWindowStart,
+    approvalWindowEnd,
     status,
     statusLabel: deliverable.manualStatusLabel ?? STATUS_LABEL[status],
     isEstimatedDate: deliverable.isEstimated,

@@ -226,7 +226,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function ganttRange(fronts: FrontView[], cutoffDate: Date) {
   const dates = fronts
     .flatMap((f) => f.deliverables)
-    .flatMap((d) => [d.ganttStart, d.approvalWindowStart, d.ganttEnd])
+    .flatMap((d) => [d.ganttStart, d.approvalWindowStart, d.approvalWindowEnd, d.ganttEnd])
     .filter((d): d is Date => !!d);
   dates.push(cutoffDate);
   const start = new Date(Math.min(...dates.map((d) => d.getTime())) - 3 * DAY_MS);
@@ -252,7 +252,7 @@ function GanttPage({ view }: { view: ProjectView }) {
     flatRows.push({ kind: "front", front });
     front.deliverables.forEach((deliverable) => {
       flatRows.push({ kind: "deliverable", front, deliverable });
-      if (deliverable.hasApprovalWindow && deliverable.approvalWindowStart && deliverable.ganttEnd) {
+      if (deliverable.hasApprovalWindow && deliverable.approvalWindowStart && deliverable.approvalWindowEnd) {
         flatRows.push({ kind: "approval", front, deliverable });
       }
     });
@@ -361,11 +361,11 @@ function GanttPage({ view }: { view: ProjectView }) {
                   key={i}
                   x={labelWidth + x(d.approvalWindowStart!)}
                   y={barY}
-                  width={Math.max(2, x(d.ganttEnd!) - x(d.approvalWindowStart!))}
+                  width={Math.max(2, x(d.approvalWindowEnd!) - x(d.approvalWindowStart!))}
                   height={7}
                   rx={1.5}
-                  fill="#9ca3af"
-                  fillOpacity={0.5}
+                  fill={d.approvalColorHex}
+                  fillOpacity={0.55}
                 />
               );
             }

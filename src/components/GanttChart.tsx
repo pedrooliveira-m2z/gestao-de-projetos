@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import type { FrontView, DeliverableView } from "@/lib/project-data";
 import { formatShortDate } from "@/lib/format";
-import { updateDeliverableDatesAction } from "@/app/admin/actions";
+import { updateDeliverableDatesAction, updateDeliverableApprovalWindowAction } from "@/app/admin/actions";
 
 const LABEL_COL_WIDTH = 260;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +61,7 @@ function DeliverableBar({
   colorHex,
   canEdit,
   titleText,
+  variant = "solid",
   onPreview,
   onCommit,
 }: {
@@ -72,6 +73,7 @@ function DeliverableBar({
   colorHex: string;
   canEdit: boolean;
   titleText: string;
+  variant?: "solid" | "approval";
   onPreview: (start: Date, end: Date) => void;
   onCommit: (start: Date, end: Date, fields: DragFields) => void;
 }) {
@@ -138,8 +140,22 @@ function DeliverableBar({
     onPointerCancel: handleUp,
   };
 
+  const barStyleExtra: React.CSSProperties =
+    variant === "approval"
+      ? {
+          backgroundColor: colorHex,
+          opacity: 0.65,
+          backgroundImage:
+            "repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0, rgba(255,255,255,0.45) 2px, transparent 2px, transparent 6px)",
+        }
+      : { backgroundColor: colorHex };
+  const barClassName =
+    variant === "approval"
+      ? "absolute top-1/2 h-3 -translate-y-1/2 rounded-sm border border-dashed border-neutral-500"
+      : "absolute top-1/2 h-4 -translate-y-1/2 rounded-sm";
+
   return (
-    <div ref={trackRef} className="relative flex-1 py-2">
+    <div ref={trackRef} className={`relative flex-1 ${variant === "approval" ? "py-1.5" : "py-2"}`}>
       {kind === "MILESTONE" && end ? (
         <div
           className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rotate-45"
@@ -157,13 +173,13 @@ function DeliverableBar({
         start &&
         end && (
           <div
-            className="absolute top-1/2 h-4 -translate-y-1/2 rounded-sm"
+            className={barClassName}
             style={{
               left: `${pct(start, rangeStart, rangeEnd)}%`,
               width: `${Math.max(0.6, pct(end, rangeStart, rangeEnd) - pct(start, rangeStart, rangeEnd))}%`,
-              backgroundColor: colorHex,
               cursor: canEdit ? "grab" : undefined,
               touchAction: "none",
+              ...barStyleExtra,
             }}
             onPointerDown={beginDrag("move")}
             {...dragEvents}
@@ -204,11 +220,14 @@ export function GanttChart({
   canEdit?: boolean;
 }) {
   const [overrides, setOverrides] = useState<Record<string, { start: Date; end: Date }>>({});
+  const [approvalOverrides, setApprovalOverrides] = useState<Record<string, { start: Date; end: Date }>>(
+    {}
+  );
   const [, startSaving] = useTransition();
 
   const allDates = fronts
     .flatMap((f) => f.deliverables)
-    .flatMap((d) => [d.ganttStart, d.approvalWindowStart, d.ganttEnd])
+    .flatMap((d) => [d.ganttStart, d.approvalWindowStart, d.approvalWindowEnd, d.ganttEnd])
     .filter((d): d is Date => !!d);
   allDates.push(cutoffDate);
 
@@ -236,6 +255,24 @@ export function GanttChart({
     startSaving(async () => {
       await updateDeliverableDatesAction(projectId, deliverableId, payload);
       setOverrides((prev) => {
+        const next = { ...prev };
+        delete next[deliverableId];
+        return next;
+      });
+    });
+  }
+
+  function previewApproval(deliverableId: string, start: Date, end: Date) {
+    setApprovalOverrides((prev) => ({ ...prev, [deliverableId]: { start, end } }));
+  }
+
+  function commitApproval(deliverableId: string, start: Date, end: Date, fields: DragFields) {
+    const payload: { approvalStartOverride?: string | null; approvalEndOverride?: string | null } = {};
+    if (fields === "both" || fields === "start") payload.approvalStartOverride = start.toISOString();
+    if (fields === "both" || fields === "end") payload.approvalEndOverride = end.toISOString();
+    startSaving(async () => {
+      await updateDeliverableApprovalWindowAction(projectId, deliverableId, payload);
+      setApprovalOverrides((prev) => {
         const next = { ...prev };
         delete next[deliverableId];
         return next;
@@ -347,27 +384,36 @@ export function GanttChart({
                         onCommit={(s, e, fields) => commitDates(d.id, s, e, fields)}
                       />
                     </div>
-                    {d.hasApprovalWindow && d.approvalWindowStart && d.ganttEnd && (
-                      <div className="flex border-b border-neutral-100 bg-neutral-50/60">
-                        <div style={{ width: LABEL_COL_WIDTH }} className="shrink-0 px-4 py-1.5 pl-8">
-                          <p className="text-[11px] text-neutral-500">↳ Aprovação do cliente</p>
-                        </div>
-                        <div className="relative flex-1 py-1.5">
-                          <div
-                            className="absolute top-1/2 h-3 -translate-y-1/2 rounded-sm border border-dashed border-neutral-400 bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.12)_0,rgba(0,0,0,0.12)_2px,transparent_2px,transparent_6px)]"
-                            style={{
-                              left: `${pct(d.approvalWindowStart, rangeStart, rangeEnd)}%`,
-                              width: `${Math.max(
-                                0.6,
-                                pct(d.ganttEnd, rangeStart, rangeEnd) -
-                                  pct(d.approvalWindowStart, rangeStart, rangeEnd)
-                              )}%`,
-                            }}
-                            title={`Aprovação: ${formatShortDate(d.approvalWindowStart)} - ${formatShortDate(d.ganttEnd)}`}
-                          />
-                        </div>
-                      </div>
-                    )}
+                    {d.hasApprovalWindow &&
+                      (() => {
+                        const aov = approvalOverrides[d.id];
+                        const approvalStart = aov?.start ?? d.approvalWindowStart;
+                        const approvalEnd = aov?.end ?? d.approvalWindowEnd;
+                        if (!approvalStart || !approvalEnd) return null;
+                        return (
+                          <div className="flex border-b border-neutral-100 bg-neutral-50/60">
+                            <div
+                              style={{ width: LABEL_COL_WIDTH }}
+                              className="shrink-0 px-4 py-1.5 pl-8"
+                            >
+                              <p className="text-[11px] text-neutral-500">↳ Aprovação do cliente</p>
+                            </div>
+                            <DeliverableBar
+                              kind="BAR"
+                              start={approvalStart}
+                              end={approvalEnd}
+                              rangeStart={rangeStart}
+                              rangeEnd={rangeEnd}
+                              colorHex={d.approvalColorHex}
+                              canEdit={canEdit}
+                              variant="approval"
+                              titleText={`Aprovação: ${formatShortDate(approvalStart)} - ${formatShortDate(approvalEnd)}`}
+                              onPreview={(s, e) => previewApproval(d.id, s, e)}
+                              onCommit={(s, e, fields) => commitApproval(d.id, s, e, fields)}
+                            />
+                          </div>
+                        );
+                      })()}
                   </div>
                 );
               })}

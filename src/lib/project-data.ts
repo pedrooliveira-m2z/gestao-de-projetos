@@ -22,7 +22,9 @@ export interface DeliverableView {
   ganttStart: Date | null;
   ganttEnd: Date | null;
   approvalWindowStart: Date | null;
+  approvalWindowEnd: Date | null;
   hasApprovalWindow: boolean;
+  approvalColorHex: string;
   isEstimated: boolean;
   clickupUrl: string | null;
 }
@@ -106,7 +108,9 @@ export async function loadProjectView(projectId: string): Promise<ProjectView | 
         ganttStart: timeline.ganttStart,
         ganttEnd: timeline.ganttEnd,
         approvalWindowStart: timeline.approvalWindowStart,
+        approvalWindowEnd: timeline.approvalWindowEnd,
         hasApprovalWindow: d.hasApprovalWindow,
+        approvalColorHex: d.approvalColorHex ?? "#9ca3af",
         isEstimated: timeline.isEstimatedDate,
         clickupUrl: rawTask?.url ?? null,
       };
