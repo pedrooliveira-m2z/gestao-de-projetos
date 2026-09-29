@@ -166,6 +166,21 @@ export async function updateDeliverableNameAction(
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function updateDeliverableRuleLabelAction(
+  projectId: string,
+  deliverableId: string,
+  ruleLabel: string | null
+) {
+  await assertInternal();
+  await prisma.deliverable.update({
+    where: { id: deliverableId },
+    data: { ruleLabel: ruleLabel?.trim() || null },
+  });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function reorderDeliverablesAction(
   projectId: string,
   frontId: string,

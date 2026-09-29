@@ -9,6 +9,7 @@ import {
   addDeliverableAction,
   reorderDeliverablesAction,
   updateDeliverableNameAction,
+  updateDeliverableRuleLabelAction,
   deleteDeliverableAction,
 } from "@/app/admin/actions";
 
@@ -236,9 +237,14 @@ export function GanttChart({
   const [reorderedFronts, setReorderedFronts] = useState<Record<string, boolean>>({});
   const dragDeliverableRef = useRef<{ frontId: string; id: string } | null>(null);
   const [pendingNames, setPendingNames] = useState<Record<string, string>>({});
+  const [pendingRuleLabels, setPendingRuleLabels] = useState<Record<string, string>>({});
 
   function stageName(id: string, name: string) {
     setPendingNames((prev) => ({ ...prev, [id]: name }));
+  }
+
+  function stageRuleLabel(id: string, ruleLabel: string) {
+    setPendingRuleLabels((prev) => ({ ...prev, [id]: ruleLabel }));
   }
 
   async function removeDeliverable(id: string, name: string) {
@@ -325,14 +331,20 @@ export function GanttChart({
     }));
   }
 
-  const nameById = new Map(fronts.flatMap((f) => f.deliverables).map((d) => [d.id, d.name]));
+  const allDeliverables = fronts.flatMap((f) => f.deliverables);
+  const nameById = new Map(allDeliverables.map((d) => [d.id, d.name]));
+  const ruleLabelById = new Map(allDeliverables.map((d) => [d.id, d.ruleLabel ?? ""]));
   const dirtyNameIds = Object.keys(pendingNames).filter((id) => pendingNames[id] !== nameById.get(id));
+  const dirtyRuleLabelIds = Object.keys(pendingRuleLabels).filter(
+    (id) => pendingRuleLabels[id] !== ruleLabelById.get(id)
+  );
 
   const pendingCount =
     Object.keys(pendingDateFields).length +
     Object.keys(pendingApprovalFields).length +
     Object.keys(reorderedFronts).length +
-    dirtyNameIds.length;
+    dirtyNameIds.length +
+    dirtyRuleLabelIds.length;
 
   useEffect(() => {
     if (pendingCount === 0) return;
@@ -366,6 +378,9 @@ export function GanttChart({
           return reorderDeliverablesAction(projectId, frontId, order);
         }),
         ...dirtyNameIds.map((id) => updateDeliverableNameAction(projectId, id, pendingNames[id])),
+        ...dirtyRuleLabelIds.map((id) =>
+          updateDeliverableRuleLabelAction(projectId, id, pendingRuleLabels[id])
+        ),
       ]);
       setOverrides({});
       setApprovalOverrides({});
@@ -374,6 +389,7 @@ export function GanttChart({
       setOrderOverrides({});
       setReorderedFronts({});
       setPendingNames({});
+      setPendingRuleLabels({});
     });
   }
 
@@ -385,6 +401,7 @@ export function GanttChart({
     setOrderOverrides({});
     setReorderedFronts({});
     setPendingNames({});
+    setPendingRuleLabels({});
   }
 
   function addRow(frontId: string, formData: FormData) {
@@ -594,7 +611,17 @@ export function GanttChart({
                           ) : (
                             <p className="text-sm font-medium text-neutral-800">{d.name}</p>
                           )}
-                          {d.ruleLabel && <p className="text-[11px] text-neutral-400">{d.ruleLabel}</p>}
+                          {canEdit ? (
+                            <textarea
+                              value={pendingRuleLabels[d.id] ?? d.ruleLabel ?? ""}
+                              onChange={(e) => stageRuleLabel(d.id, e.target.value)}
+                              placeholder="Descrição / regra de prazo"
+                              rows={2}
+                              className="mt-0.5 w-full resize-y rounded border border-transparent bg-transparent px-1 -mx-1 text-[11px] text-neutral-400 hover:border-neutral-200 focus:border-neutral-400 focus:bg-white focus:text-neutral-700 focus:outline-none"
+                            />
+                          ) : (
+                            d.ruleLabel && <p className="text-[11px] text-neutral-400">{d.ruleLabel}</p>
+                          )}
                         </div>
                         {canEdit && (
                           <button
