@@ -127,6 +127,10 @@ export async function addDeliverableAction(projectId: string, frontId: string, f
       manualStatusLabel: String(formData.get("manualStatusLabel") ?? "") || null,
       hasApprovalWindow: formData.get("hasApprovalWindow") === "on",
       approvalDays: parseOptionalInt(formData.get("approvalDays")) ?? 5,
+      approvalColorHex:
+        formData.get("hasApprovalWindow") === "on"
+          ? String(formData.get("approvalColorHex") ?? "") || null
+          : null,
       colorHexOverride:
         formData.get("hasColorOverride") === "on"
           ? String(formData.get("colorHexOverride") ?? "") || null

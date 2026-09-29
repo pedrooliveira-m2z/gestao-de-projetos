@@ -314,6 +314,13 @@ export default async function AdminProjectPage({
                   </label>
                   <label className="flex items-center gap-1.5 text-xs text-neutral-600">
                     <input type="checkbox" name="hasApprovalWindow" /> tem janela de aprovação
+                    <input
+                      type="color"
+                      name="approvalColorHex"
+                      defaultValue="#9ca3af"
+                      title="Cor da janela de aprovação (só aplica se marcado acima)"
+                      className="h-7 w-9 cursor-pointer rounded border border-neutral-300"
+                    />
                   </label>
                   <input
                     type="number"
