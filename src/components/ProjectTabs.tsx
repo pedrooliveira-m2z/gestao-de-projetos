@@ -22,8 +22,14 @@ export function ProjectTabs({ projectId, active }: { projectId: string; active: 
         </Link>
       ))}
       <a
-        href={`/projects/${projectId}/report`}
+        href={`/projects/${projectId}/report-excel`}
         className="ml-auto mb-1 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:border-neutral-500"
+      >
+        Baixar planilha Excel
+      </a>
+      <a
+        href={`/projects/${projectId}/report`}
+        className="mb-1 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:border-neutral-500"
       >
         Baixar relatório PDF
       </a>
