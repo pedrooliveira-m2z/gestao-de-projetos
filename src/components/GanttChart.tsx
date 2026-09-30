@@ -757,13 +757,14 @@ export function GanttChart({
                             end: ganttEnd,
                             colorHex: d.colorHex,
                             titleText:
-                              d.kind === "MILESTONE" && ganttEnd
+                              (d.kind === "MILESTONE" && ganttEnd
                                 ? formatShortDate(ganttEnd)
                                 : ganttStart && ganttEnd
                                   ? `${formatShortDate(ganttStart)} - ${formatShortDate(ganttEnd)}`
-                                  : "",
+                                  : "") + " (clique duplo para remover a entrega)",
                             onPreview: (s, e) => previewDates(d.id, s, e),
                             onCommit: (s, e, fields) => stageDates(d.id, s, e, fields),
+                            onDelete: () => removeDeliverable(d.id, d.name),
                           },
                           ...d.marks.map((m) => {
                             const mov = markOverrides[m.id];
