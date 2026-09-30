@@ -28,6 +28,7 @@ export interface DeliverableView {
   isEstimated: boolean;
   clickupUrl: string | null;
   marks: DeliverableMarkView[];
+  manualStatusLabel: string | null;
 }
 
 export interface DeliverableMarkView {
@@ -132,6 +133,7 @@ export async function loadProjectView(projectId: string): Promise<ProjectView | 
           end: m.endDate,
           colorHex: m.colorHex ?? d.colorHexOverride ?? front.colorHex,
         })),
+        manualStatusLabel: d.manualStatusLabel,
       };
     }),
   }));

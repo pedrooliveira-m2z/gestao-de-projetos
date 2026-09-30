@@ -215,6 +215,21 @@ export async function deleteDeliverableMarkAction(projectId: string, markId: str
   revalidatePath(`/projects/${projectId}/gantt`);
 }
 
+export async function updateDeliverableStatusLabelAction(
+  projectId: string,
+  deliverableId: string,
+  statusLabel: string | null
+) {
+  await assertInternal();
+  await prisma.deliverable.update({
+    where: { id: deliverableId },
+    data: { manualStatusLabel: statusLabel?.trim() || null },
+  });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/gantt`);
+}
+
 export async function reorderDeliverablesAction(
   projectId: string,
   frontId: string,

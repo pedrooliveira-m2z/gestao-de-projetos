@@ -127,9 +127,17 @@ export function computeDeliverableTimeline(
   const operationalDueDate =
     clickup?.dueDate ?? (!isContractualDeadline ? deliverable.endDateOverride ?? null : null);
 
+  // Atalhos manuais de status (atrasado/bloqueado/em andamento) também redefinem o balde de
+  // cor da leitura executiva, não só o texto — senão o ponto fica com a cor "errada".
+  const manualLower = (deliverable.manualStatusLabel ?? "").toLowerCase();
+
   let status: DeliverableStatus;
   if (isDone) {
     status = "CONCLUIDO";
+  } else if (manualLower === "atrasado" || manualLower === "bloqueado") {
+    status = "ATRASO_OPERACIONAL";
+  } else if (manualLower === "em andamento") {
+    status = "EM_DIA";
   } else if (isContractualDeadline && deadline && deadline < cutoffDate) {
     // Passou do prazo contratual calculado a partir do gatilho, sem sinal de conclusão.
     status = "ATRASO_CONTRATUAL";

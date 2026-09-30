@@ -10,13 +10,16 @@ import {
   reorderDeliverablesAction,
   updateDeliverableNameAction,
   updateDeliverableRuleLabelAction,
+  updateDeliverableStatusLabelAction,
   deleteDeliverableAction,
   addDeliverableMarkAction,
   updateDeliverableMarkDatesAction,
   deleteDeliverableMarkAction,
 } from "@/app/admin/actions";
 
+const FRONT_COL_WIDTH = 150;
 const LABEL_COL_WIDTH = 260;
+const TOTAL_LABEL_WIDTH = FRONT_COL_WIDTH + LABEL_COL_WIDTH;
 const DAY_COL_WIDTH = 42;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,7 +41,7 @@ function enumerateDays(start: Date, end: Date): Date[] {
 
 /** Left offset, as a CSS calc(), for a date inside the timeline area (right of the label column). */
 function timelineLeft(pctValue: number): string {
-  return `calc(${LABEL_COL_WIDTH}px + (100% - ${LABEL_COL_WIDTH}px) * ${pctValue / 100})`;
+  return `calc(${TOTAL_LABEL_WIDTH}px + (100% - ${TOTAL_LABEL_WIDTH}px) * ${pctValue / 100})`;
 }
 
 type DragFields = "both" | "start" | "end";
@@ -299,6 +302,7 @@ export function GanttChart({
   const dragDeliverableRef = useRef<{ frontId: string; id: string } | null>(null);
   const [pendingNames, setPendingNames] = useState<Record<string, string>>({});
   const [pendingRuleLabels, setPendingRuleLabels] = useState<Record<string, string>>({});
+  const [pendingStatusLabels, setPendingStatusLabels] = useState<Record<string, string>>({});
   const [markOverrides, setMarkOverrides] = useState<Record<string, { start: Date; end: Date }>>({});
   const [pendingMarkFields, setPendingMarkFields] = useState<Record<string, DragFields>>({});
   const [, startAddingMark] = useTransition();
@@ -309,6 +313,10 @@ export function GanttChart({
 
   function stageRuleLabel(id: string, ruleLabel: string) {
     setPendingRuleLabels((prev) => ({ ...prev, [id]: ruleLabel }));
+  }
+
+  function stageStatusLabel(id: string, statusLabel: string) {
+    setPendingStatusLabels((prev) => ({ ...prev, [id]: statusLabel }));
   }
 
   async function removeDeliverable(id: string, name: string) {
@@ -424,9 +432,13 @@ export function GanttChart({
   const allDeliverables = fronts.flatMap((f) => f.deliverables);
   const nameById = new Map(allDeliverables.map((d) => [d.id, d.name]));
   const ruleLabelById = new Map(allDeliverables.map((d) => [d.id, d.ruleLabel ?? ""]));
+  const statusLabelById = new Map(allDeliverables.map((d) => [d.id, d.manualStatusLabel ?? ""]));
   const dirtyNameIds = Object.keys(pendingNames).filter((id) => pendingNames[id] !== nameById.get(id));
   const dirtyRuleLabelIds = Object.keys(pendingRuleLabels).filter(
     (id) => pendingRuleLabels[id] !== ruleLabelById.get(id)
+  );
+  const dirtyStatusLabelIds = Object.keys(pendingStatusLabels).filter(
+    (id) => pendingStatusLabels[id] !== statusLabelById.get(id)
   );
 
   const pendingCount =
@@ -435,6 +447,7 @@ export function GanttChart({
     Object.keys(reorderedFronts).length +
     dirtyNameIds.length +
     dirtyRuleLabelIds.length +
+    dirtyStatusLabelIds.length +
     Object.keys(pendingMarkFields).length;
 
   useEffect(() => {
@@ -472,6 +485,9 @@ export function GanttChart({
         ...dirtyRuleLabelIds.map((id) =>
           updateDeliverableRuleLabelAction(projectId, id, pendingRuleLabels[id])
         ),
+        ...dirtyStatusLabelIds.map((id) =>
+          updateDeliverableStatusLabelAction(projectId, id, pendingStatusLabels[id])
+        ),
         ...Object.entries(pendingMarkFields).map(([id, fields]) => {
           const ov = markOverrides[id];
           if (!ov) return Promise.resolve();
@@ -489,6 +505,7 @@ export function GanttChart({
       setReorderedFronts({});
       setPendingNames({});
       setPendingRuleLabels({});
+      setPendingStatusLabels({});
       setMarkOverrides({});
       setPendingMarkFields({});
     });
@@ -503,6 +520,7 @@ export function GanttChart({
     setReorderedFronts({});
     setPendingNames({});
     setPendingRuleLabels({});
+    setPendingStatusLabels({});
     setMarkOverrides({});
     setPendingMarkFields({});
   }
@@ -546,11 +564,17 @@ export function GanttChart({
           )}
         </div>
       )}
-      <div style={{ minWidth: LABEL_COL_WIDTH + days.length * DAY_COL_WIDTH }}>
+      <div style={{ minWidth: TOTAL_LABEL_WIDTH + days.length * DAY_COL_WIDTH }}>
         {/* Timeline header */}
         <div className="relative flex border-b border-neutral-200 bg-[#0b0e14] text-white">
+          <div
+            style={{ width: FRONT_COL_WIDTH }}
+            className="shrink-0 border-r border-white/10 px-4 py-2 text-xs font-semibold uppercase"
+          >
+            Frente
+          </div>
           <div style={{ width: LABEL_COL_WIDTH }} className="shrink-0 px-4 py-2 text-xs font-semibold uppercase">
-            Frente / entrega
+            Entrega
           </div>
           <div className="relative flex-1">
             <div className="flex h-full">
@@ -587,7 +611,7 @@ export function GanttChart({
                 className="pointer-events-none absolute top-0 bottom-0 bg-neutral-50"
                 style={{
                   left: timelineLeft(leftPct),
-                  width: `calc((100% - ${LABEL_COL_WIDTH}px) * ${(rightPct - leftPct) / 100})`,
+                  width: `calc((100% - ${TOTAL_LABEL_WIDTH}px) * ${(rightPct - leftPct) / 100})`,
                 }}
               />
             );
@@ -698,6 +722,18 @@ export function GanttChart({
                       onDrop={handleRowDrop(front, d.id)}
                     >
                       <div
+                        style={{ width: FRONT_COL_WIDTH }}
+                        className="flex shrink-0 items-center gap-1.5 border-r border-neutral-100 bg-neutral-50/60 px-3 py-2"
+                      >
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: front.colorHex }}
+                        />
+                        <span className="truncate text-[11px] text-neutral-500" title={`${front.vendorName} — ${front.name}`}>
+                          {front.name}
+                        </span>
+                      </div>
+                      <div
                         style={{ width: LABEL_COL_WIDTH }}
                         className="flex shrink-0 items-start gap-1.5 px-4 py-2"
                       >
@@ -731,6 +767,19 @@ export function GanttChart({
                             />
                           ) : (
                             d.ruleLabel && <p className="text-[11px] text-neutral-400">{d.ruleLabel}</p>
+                          )}
+                          {canEdit && (
+                            <select
+                              value={pendingStatusLabels[d.id] ?? d.manualStatusLabel ?? ""}
+                              onChange={(e) => stageStatusLabel(d.id, e.target.value)}
+                              className="mt-1 rounded border border-neutral-200 bg-white px-1 py-0.5 text-[11px] text-neutral-600"
+                            >
+                              <option value="">Status automático</option>
+                              <option value="Atrasado">Atrasado</option>
+                              <option value="Concluído">Concluído</option>
+                              <option value="Bloqueado">Bloqueado</option>
+                              <option value="Em andamento">Em andamento</option>
+                            </select>
                           )}
                         </div>
                         {canEdit && (
@@ -793,6 +842,10 @@ export function GanttChart({
                         if (!approvalStart || !approvalEnd) return null;
                         return (
                           <div className="flex border-b border-neutral-100 bg-neutral-50/60">
+                            <div
+                              style={{ width: FRONT_COL_WIDTH }}
+                              className="shrink-0 border-r border-neutral-100"
+                            />
                             <div
                               style={{ width: LABEL_COL_WIDTH }}
                               className="shrink-0 px-4 py-1.5 pl-8"
