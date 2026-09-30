@@ -349,14 +349,10 @@ function GanttPage({ view }: { view: ProjectView }) {
             const y = headerHeight + i * rowHeight;
             if (row.kind === "front") {
               return (
-                <Rect
-                  key={i}
-                  x={0}
-                  y={y}
-                  width={labelWidth + chartWidth}
-                  height={rowHeight}
-                  fill={row.front.colorHex}
-                />
+                <React.Fragment key={i}>
+                  <Rect x={0} y={y} width={labelWidth + chartWidth} height={rowHeight} fill={INK} />
+                  <Rect x={8} y={y + rowHeight / 2 - 2.5} width={5} height={5} rx={2.5} fill={row.front.colorHex} />
+                </React.Fragment>
               );
             }
             const barY = y + rowHeight / 2 - 3.5;
@@ -417,7 +413,7 @@ function GanttPage({ view }: { view: ProjectView }) {
           {flatRows.map((row, i) => (
             <View key={i} style={{ height: rowHeight, justifyContent: "center" }}>
               {row.kind === "front" ? (
-                <Text style={{ fontSize: 7, fontWeight: 700, color: "#fff", paddingLeft: 4 }}>
+                <Text style={{ fontSize: 7, fontWeight: 700, color: "#fff", paddingLeft: 16 }}>
                   {row.front.vendorName} — {row.front.name}
                 </Text>
               ) : row.kind === "approval" ? (

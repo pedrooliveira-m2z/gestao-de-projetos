@@ -119,11 +119,12 @@ export function AdminEditableSections({
           const importFromClickup = importClickupListAction.bind(null, projectId, front.id);
           return (
             <div key={front.id} className="rounded-lg border border-neutral-200 bg-white">
-              <div
-                className="flex items-center justify-between px-4 py-2 text-sm font-bold text-white"
-                style={{ backgroundColor: front.colorHex }}
-              >
-                <span>
+              <div className="flex items-center justify-between bg-[#0b0e14] px-4 py-2 text-sm font-bold text-white">
+                <span className="flex items-center gap-2">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: front.colorHex }}
+                  />
                   {front.vendorName} — {front.name}
                 </span>
                 <form action={deleteFront}>

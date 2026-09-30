@@ -612,10 +612,11 @@ export function GanttChart({
 
           {fronts.map((front) => (
             <div key={front.id}>
-              <div
-                className="flex items-center gap-2 border-b border-neutral-200 px-4 py-1.5 text-xs font-bold text-white uppercase"
-                style={{ backgroundColor: front.colorHex }}
-              >
+              <div className="flex items-center gap-2 border-b border-neutral-200 bg-[#0b0e14] px-4 py-1.5 text-xs font-bold text-white uppercase">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: front.colorHex }}
+                />
                 {front.vendorName} — {front.name}
               </div>
               {canEdit &&
