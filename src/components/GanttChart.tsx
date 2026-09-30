@@ -610,76 +610,82 @@ export function GanttChart({
             </span>
           </div>
 
+          {canEdit &&
+            (addingRowFor ? (
+              <form
+                action={(formData) => addRow(String(formData.get("frontId") ?? addingRowFor), formData)}
+                className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-amber-50 px-4 py-2"
+              >
+                {fronts.length > 1 && (
+                  <select
+                    name="frontId"
+                    defaultValue={addingRowFor}
+                    className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                  >
+                    {fronts.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.vendorName} — {f.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  name="name"
+                  placeholder="Nome da entrega"
+                  required
+                  autoFocus
+                  className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                />
+                <select
+                  name="kind"
+                  defaultValue="BAR"
+                  className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                >
+                  <option value="BAR">Barra (início + fim)</option>
+                  <option value="MILESTONE">Marco (só data final)</option>
+                </select>
+                <input
+                  type="date"
+                  name="startDateOverride"
+                  title="Início (ignorado para marco)"
+                  className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                />
+                <input
+                  type="date"
+                  name="endDateOverride"
+                  required
+                  title="Fim / data do marco"
+                  className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={isAddingRow}
+                  className="rounded-md bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black disabled:opacity-60"
+                >
+                  {isAddingRow ? "Adicionando..." : "Adicionar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddingRowFor(null)}
+                  className="text-xs text-neutral-400 hover:underline"
+                >
+                  cancelar
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingRowFor(fronts[0]?.id ?? null)}
+                className="flex w-full items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50"
+              >
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[11px] leading-none text-blue-700">
+                  +
+                </span>
+                Adicionar entrega
+              </button>
+            ))}
           {fronts.map((front) => (
             <div key={front.id}>
-              <div className="flex items-center gap-2 border-b border-neutral-200 bg-[#0b0e14] px-4 py-1.5 text-xs font-bold text-white uppercase">
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: front.colorHex }}
-                />
-                {front.vendorName} — {front.name}
-              </div>
-              {canEdit &&
-                (addingRowFor === front.id ? (
-                  <form
-                    action={(formData) => addRow(front.id, formData)}
-                    className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-amber-50 px-4 py-2"
-                  >
-                    <input
-                      name="name"
-                      placeholder="Nome da linha"
-                      required
-                      autoFocus
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                    />
-                    <select
-                      name="kind"
-                      defaultValue="BAR"
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                    >
-                      <option value="BAR">Barra (início + fim)</option>
-                      <option value="MILESTONE">Marco (só data final)</option>
-                    </select>
-                    <input
-                      type="date"
-                      name="startDateOverride"
-                      title="Início (ignorado para marco)"
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                    />
-                    <input
-                      type="date"
-                      name="endDateOverride"
-                      required
-                      title="Fim / data do marco"
-                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isAddingRow}
-                      className="rounded-md bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black disabled:opacity-60"
-                    >
-                      {isAddingRow ? "Adicionando..." : "Adicionar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAddingRowFor(null)}
-                      className="text-xs text-neutral-400 hover:underline"
-                    >
-                      cancelar
-                    </button>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAddingRowFor(front.id)}
-                    className="flex w-full items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                  >
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[11px] leading-none text-blue-700">
-                      +
-                    </span>
-                    Adicionar linha em {front.name}
-                  </button>
-                ))}
               {orderedDeliverables(front).map((d) => {
                 const ov = overrides[d.id];
                 const ganttStart = ov?.start ?? d.ganttStart;
